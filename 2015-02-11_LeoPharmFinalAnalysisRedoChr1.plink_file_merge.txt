@@ -1,0 +1,1 @@
+2015-02-11_LeoPharmFinalAnalysisRedoChr1.chr1.output.recalibrated.filtered_plink_0.bed	2015-02-11_LeoPharmFinalAnalysisRedoChr1.chr1.output.recalibrated.filtered_plink_0.bim	2015-02-11_LeoPharmFinalAnalysisRedoChr1.chr1.output.recalibrated.filtered_plink_0.fam

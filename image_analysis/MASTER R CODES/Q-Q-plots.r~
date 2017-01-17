@@ -1,0 +1,728 @@
+############################################### Ca screen 2 " same as above but the very latest
+setwd( "/media/Bioinform-D/Research/Cellomics/Ca screen/Ca screen 2")
+load("Ca2_ann.RData")  ### renames the SUMMARY files using the map file
+core.ann<-c("plate", "row", "col", "Symbol")
+place.core.ann<-colnames(ann) %in% core.ann
+
+core.vars<-c("%R","Trans_%","Prolif_%","Z-all Green","Z-Low Green","Z-Mid Green","Z-High Green","RG","RG_expected","RG_sd","RG_Low","RG_Low_expected","RG_Mid","RG_Mid_expected","RG_High","RG_High_expected","R","RnotG","G","nG","G_Low","G_Mid","G_High","Relative S+G2","Relative S+G2+>4N","Relative <2N","Relative >4N","Relative S","G2/G1 for fit","G1 posn", "Fit quality G","Fit quality nG","Num-cells","score","RG/G","RnG/nG","nR","gt4N","Total","<cells_field>","sd_cells_field","S+G2/G1","S+G2+ >4N/G1","<2N",">4N","G1","G2","S","Gr-S+G2/G1","Gr-S+G2+ >4N/G1","Gr-<2N","Gr->4N","Gr-G1","Gr-G2","Gr-S","NtGr-S+G2/G1","NtGr-S+G2+ >4N/G1","NtGr-<2N","NtGr->4N","NtGr-G1","NtGr-G2","NtGr-S" )
+
+
+the.screen<-"Ca siRNA2"
+files<- paste("plate_",unique(ann[,"plate"]),"_SUMMARY",".RData",sep="")
+field.output.file<-"Ca2_field_summary_NOTGREEN_DNA.txt"
+well.output.file<-"Ca siRNA2.NOTGREEN3.Wells.txt"
+well.type<-384
+row.type<-16
+col.type<-24
+
+map.file<-"cellomics.to.expt.map.csv" #
+exported.well.data<-"well_based_data.txt"
+normalized.file<-paste(the.screen,"NORMALIZED","txt",sep=".")
+
+### cut offs determined after hit picking and q-qplots used here to add extra detail
+targets<-c("percent_R", "ak_leakage","resazurin","Num-cells"  )
+low.cut<-c(21,84,0.33,760)
+high.cut<-c(41,550,1.10,3500)
+names(low.cut)<-targets
+names(high.cut)<-targets
+
+#######################################################
+
+###############################################Ca screen 3  ### latest DNA and flexible annotation
+setwd("/media/Bioinform-D/Research/Cellomics/Ca screen/Ca screen 3")
+load("Ca3_ann.RData")
+core.ann<-c("plate", "row", "col", "Symbol")
+place.core.ann<-colnames(ann) %in% core.ann
+
+
+core.vars<-c("%R","Trans_%","Prolif_%","Z-all Green","Z-Low Green","Z-Mid Green","Z-High Green","RG","RG_expected","RG_sd","RG_Low","RG_Low_expected","RG_Mid","RG_Mid_expected","RG_High","RG_High_expected","R","RnotG","G","nG","G_Low","G_Mid","G_High","Relative S+G2","Relative S+G2+>4N","Relative <2N","Relative >4N","Relative S","G2/G1 for fit","G1 posn", "Fit quality G","Fit quality nG","Num-cells","score","RG/G","RnG/nG","nR","gt4N","Total","<cells_field>","sd_cells_field","S+G2/G1","S+G2+ >4N/G1","<2N",">4N","S")
+
+the.screen<-"Ca siRNA3"
+files<- paste("plate_",unique(ann[,"plate"]),"_SUMMARY",".RData",sep="")
+field.output.file<-"Ca3_field_summary_NOTGREEN_DNA.txt"
+well.output.file<-"Ca siRNA3.NOTGREEN3.Wells.txt" # name now after adding well data
+well.type<-384
+row.type<-16
+col.type<-24
+
+map.file<-"cellomics.to.expt.map.csv" #
+exported.well.data<-"well_based_data.txt"
+normalized.file<-paste(the.screen,"NORMALIZED","txt",sep=".")
+
+### cut offs determined after hit picking and q-qplots used here to add extra detail
+targets<-c("percent_R", "ak_leakage","resazurin","Num-cells"  )
+low.cut<-c(37,890,10300,600)
+high.cut<-c(52,1495,32000,1500)
+names(low.cut)<-targets
+names(high.cut)<-targets
+#######################################################
+
+############################################### millian  ### latest DNA and flexible annotation
+setwd("/media/Bioinform-D/Research/Cellomics/millian")
+load("siFB_ann.RData")  ### "plate" must match "plate" in file  cellomics to expt map.csv
+core.ann<-c("plate", "row", "col", "Symbol")
+place.core.ann<-colnames(ann) %in% core.ann
+
+core.vars<-c("%R","Trans_%","Prolif_%","Z-all Green","Z-Low Green","Z-Mid Green","Z-High Green","RG","RG_expected","RG_sd","RG_Low","RG_Low_expected","RG_Mid","RG_Mid_expected","RG_High","RG_High_expected","R","RnotG","G","nG","G_Low","G_Mid","G_High","Relative S+G2","Relative S+G2+>4N","Relative <2N","Relative >4N","Relative S","G2/G1 for fit","G1 posn", "Fit quality G","Fit quality nG","Num-cells","score","RG/G","RnG/nG","nR","gt4N","Total","<cells_field>","sd_cells_field","S+G2/G1","S+G2+ >4N/G1","<2N",">4N","G1","G2","S","Gr-S+G2/G1","Gr-S+G2+ >4N/G1","Gr-<2N","Gr->4N","Gr-G1","Gr-G2","Gr-S","NtGr-S+G2/G1","NtGr-S+G2+ >4N/G1","NtGr-<2N","NtGr->4N","NtGr-G1","NtGr-G2","NtGr-S"
+             )
+
+the.screen<-"siFB"
+files<- paste("plate_",unique(ann[,"plate"]),"_SUMMARY",".RData",sep="")
+field.output.file<-"siFB_field_summary_NOTGREEN_DNA.txt"
+well.output.file<-"siFB.NOTGREEN3.Wells.txt"
+well.type<-384
+row.type<-16
+col.type<-24
+exported.well.data<-"well_based_data.txt"
+
+normalized.file<-paste(the.screen,"NORMALIZED","txt",sep=".")
+
+
+targets<-c("S+G2_over_G1","percent_R", "ak_leakage","resazurin","Num-cells")
+
+##"S+G2_over_G1" > 40 look crappy
+low.cut<-c(1.05,42,3600,25500,4700)
+high.cut<-c(2.5,65.2,8600,53000,7900)
+names(low.cut)<-targets
+names(high.cut)<-targets
+#######################################################
+
+############################################### JOseph 2010  ### latest DNA and flexible annotation
+setwd("/media/Bioinform-D/Research/Cellomics/Joseph screen 2010")
+load("ann1500.RData")  ### "plate" must match "plate" in file  cellomics to expt map.csv
+core.ann<-c("plate", "row", "col", "Symbol")
+place.core.ann<-colnames(ann) %in% core.ann
+
+core.vars<-c("%R","Trans_%","Prolif_%","Z-all Green","Z-Low Green","Z-Mid Green","Z-High Green","RG","RG_expected","RG_sd","RG_Low","RG_Low_expected","RG_Mid","RG_Mid_expected","RG_High","RG_High_expected","R","RnotG","G","nG","G_Low","G_Mid","G_High","Relative S+G2","Relative S+G2+>4N","Relative <2N","Relative >4N","Relative S","G2/G1 for fit","G1 posn", "Fit quality G","Fit quality nG","Num-cells","score","RG/G","RnG/nG","nR","gt4N","Total","<cells_field>","sd_cells_field","S+G2/G1","S+G2+ >4N/G1","<2N",">4N","G1","G2","S","Gr-S+G2/G1","Gr-S+G2+ >4N/G1","Gr-<2N","Gr->4N","Gr-G1","Gr-G2","Gr-S","NtGr-S+G2/G1","NtGr-S+G2+ >4N/G1","NtGr-<2N","NtGr->4N","NtGr-G1","NtGr-G2","NtGr-S"
+             )
+
+the.screen<-"Joseph_2010"
+files<- paste("plate_",unique(ann[,"plate"]),"_SUMMARY",".RData",sep="")
+field.output.file<-"Joseph_2010_field_summary_NOTGREEN_DNA.txt"
+well.output.file<-"Joseph_2010_summary_NOTGREEN_DNA.txt"
+well.type<-96
+row.type<-8
+col.type<-12
+
+normalized.file<-paste(the.screen,"NORMALIZED","txt",sep=".")
+targets<-c("Num-cells","Z-all Green","Relative S+G2+_gt_4N","Gr-S+G2+ _gt_4N_over_G1","RG_over_G","RG_over_G_Z","Gr-G1","RG_over_G_over_EtoH"  )
+
+
+######################################################
+
+############################################### Jane  ### latest DNA and flexible annotation
+setwd("/media/Bioinform-D/Research/Cellomics/Jane")
+load("Jane_ann.RData")  ### "plate" must match "plate" in file  cellomics to expt map.csv
+core.ann<-c("plate", "row", "col", "Symbol")
+place.core.ann<-colnames(ann) %in% core.ann
+
+core.vars<-c("%R","Trans_%","Prolif_%","Z-all Green","Z-Low Green","Z-Mid Green","Z-High Green","RG","RG_expected","RG_sd","RG_Low","RG_Low_expected","RG_Mid","RG_Mid_expected","RG_High","RG_High_expected","R","RnotG","G","nG","G_Low","G_Mid","G_High","Relative S+G2","Relative S+G2+>4N","Relative <2N","Relative >4N","Relative S","G2/G1 for fit","G1 posn", "Fit quality G","Fit quality nG","Num-cells","score","RG/G","RnG/nG","nR","gt4N","Total","<cells_field>","sd_cells_field","S+G2/G1","S+G2+ >4N/G1","<2N",">4N","G1","G2","S","Gr-S+G2/G1","Gr-S+G2+ >4N/G1","Gr-<2N","Gr->4N","Gr-G1","Gr-G2","Gr-S","NtGr-S+G2/G1","NtGr-S+G2+ >4N/G1","NtGr-<2N","NtGr->4N","NtGr-G1","NtGr-G2","NtGr-S")
+
+the.screen<-"Jane"
+files<- paste("plate_",unique(ann[,"plate"]),"_SUMMARY",".RData",sep="")
+field.output.file<-"Jane_field_summary_NOTGREEN_DNA.txt"
+well.output.file<-"Jane_summary_NOTGREEN_DNA.txt"
+well.type<-96
+row.type<-8
+col.type<-12
+
+normalized.file<-paste(the.screen,"NORMALIZED","txt",sep=".")
+
+targets<-c("Num-cells","Z-all Green","Relative S+G2+_gt_4N","Gr-S+G2+ _gt_4N_over_G1","RG_over_G","RG_over_G_Z","Gr-G1","RG_over_G_over_EtoH"  )
+load("a.screen.cuts.RData")
+
+#######################################################
+
+
+#### new annotation way
+normalized<-read.delim(normalized.file,header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
+col<-colnames(normalized) %in% core.ann
+labels<-c(colnames(normalized)[col],core.vars,colnames(ann)[!place.core.ann])## 
+colnames(normalized)[1:length(labels)]<-labels
+
+
+plates.all<-normalized
+labels<-gsub("%","percent_",colnames(plates.all))
+labels<-gsub("/","_over_",labels)
+labels<-gsub(">","_gt_",labels)
+colnames(plates.all)<-labels
+colnames(plates.all)<-gsub("/","_",colnames(plates.all))
+
+#####old annotatio way
+## plates.all<-read.delim(well.output.file,header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE) ##Unnormalized
+## colnames(plates.all)<-sum.vars
+## normalized<-read.delim(paste(the.screen,"NORMALIZED","txt",sep="."),header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
+## colnames(normalized)<-sum.vars
+
+
+#################################################################################
+#normalized.file<-paste(the.screen,"NORMALIZED","txt",sep=".")
+## targets<-c("Z-all Green","Z-Low Green","Z-Mid Green","Z-High Green","%R","Num-cells","MEAN_Area","MEAN_LWR","MEAN_P2A","MEAN_Total_I","SD_LWR","SD_P2A")
+## targets<-c("%R","S+G2_G1","S","ak_leakage","resazurin","Cell_count","MEAN_Area","MEAN_LWR","MEAN_P2A","MEAN_Avg_Inten","MEAN_Total_Inten","SD_LWR","SD_P2A")
+## targets<-c("percent_R", "ak_leakage","resazurin","Num-cells"  ) # ca  2 and 3
+## targets<-c("S+G2_over_G1","percent_R", "ak_leakage","resazurin","Num-cells") # fisal
+
+sort(tapply(plates.all[,"Symbol"],plates.all[,"Symbol"],length))
+##two.color
+
+
+########Jane
+pos.control.list<-c("CCND1")
+pos.control.list2<-c("PLV411") 
+norm.control.list<-c("HSPCN111-N") # controls that could be used for  normalization
+confounders.list<-c("MOCK","UNTRANSDUCED","no DNA")
+
+########Joseph
+pos.control.list<-c("CCNE1","101-CCNE1","411-CCNE1","101-CYCD2","1H7-CyclD2") # controls that would affect mediann center normalization
+pos.control.list<-c("CCNE1","101-CCNE1","411-CCNE1","101-CYCD2")
+norm.control.list<-c("PLV101","plv101","PLV101-2") 
+confounders.list<-c("MOCK","UNTRANSDUCED","no DNA")
+
+## pos.control.list<-c("CCNE1","101-CCNE1","411-CCNE1","101-CYCD2","not transduced","MOCK") # controls that would affect mediann center normalization
+## norm.control.list<-c("PLV101","plv101","PLV101-2","CPNE3","PSTPIP2") # controls that could be used for  normalization
+
+###for single color siRNA
+pos.control.list<-c("PLK1")
+pos.control.list2<-c("BCL2L1","IRS1","MCL1") 
+norm.control.list<-c("NT") # controls that could be used for  normalization
+confounders.list<-c("mediaonly","cellonly","old control") # stuff that couls make that q-q plot difficult like a lots of negative controls etc
+used.pos.control.list<-c("LAMA","GFP","PLK1","ATP2C1","empty","No Cells","No Lipid","mediaonly","cellonly","old control")
+used.neg.control.list<-c("NT")
+
+
+### mediaonly cellonly  is an ak.leakage negative control
+#### if a list of hits are known
+my.hits<-c("EDN2","NPR1","TACR1","ATP2C1","BDKRB2","CD8A","CD24","CCL3L1","GP1BA","CSF1","TRPC1","FGA","TRPM3","TRPV4","GNB5","TREML1","DEFA1","KIR3DL1","DEFA5","EIF2S1","SERPINE2","S100P","NUTF2","F7") 
+my.2nd.hits<-c("CCR7","RAPGEF3","ADRA1B","IL10","NTF5","THY1","PAPOLA","DIO2","ATP5I","FOS")
+conf.hits<-c("PLK1","BCL2L1","IRS1","EGFR","MCL1") # EGFR only in the context of MCF10a
+other.hits<-c("IRS1","TRHR","TRPV4","TREML1","ATP6V1C1","ATP6V1B1","LPA")
+conf.hits<-c("BCL2L1","IRS1","MCL1") 
+#############################################################################################
+#############################################################################################
+#############################################################################################
+################################# restart from written files  Q_Q PLOTS
+#plates.all<-plates.all.ori
+plates.all.ori<-plates.all
+
+## for(i in 1:
+a.screen.cuts.ori<-a.screen.cuts
+a.screen.cuts<-list()
+
+low.cut<-rep(0,times=length(targets))
+high.cut<-rep(0,times=length(targets))
+names(low.cut)<-targets
+names(high.cut)<-targets
+
+
+## the.screens<-c("si FB1","si FB2","si FB3")
+the.screens<-c("MUS.a","MUS.b","MUS.c")
+for(i in 1:length(the.screens)){
+cuts<-list(low.cut=low.cut,high.cut=high.cut)
+ a.screen.cuts[the.screens[i]]<- list(cuts)
+}
+a.screen.cuts
+
+a.screen.cuts<-a.screen.cuts.ori
+
+
+########## add extra parameters to an existing screen:
+the.screens<-c("MUS.a","MUS.b","MUS.c")
+for(i in 1:length(the.screens)){
+  for(j in 7:length(targets)){
+a.screen.cuts[[the.screens[i]]]$low.cut[targets[j]]<-0
+a.screen.cuts[[the.screens[i]]]$high.cut[targets[j]]<-0
+}
+}
+
+#######################
+i<-0
+
+i<-i+1
+
+
+
+###################################### RESTART
+plates.all<-plates.all.ori
+norm<-plates.all
+the.score
+
+#####
+## the.cells<-"HACK"
+## the.screen<-"si FB1"
+the.cells<-"EtOH"
+the.screen<-"MUS.a"
+wanted.screen<-grepl(the.screen,norm[,"plate"])
+sum(wanted.screen)
+norm<-norm[wanted.screen,]
+unique(norm[,"plate"])
+#####
+
+#####
+## the.cells<-"C33A"
+## the.screen<-"si FB2"
+the.cells<-"ICI"
+the.screen<-"MUS.b"
+wanted.screen<-grepl(the.screen,norm[,"plate"])
+sum(wanted.screen)
+norm<-norm[wanted.screen,]
+unique(norm[,"plate"])
+#####
+
+#####
+## the.cells<-"CASKI"
+## the.screen<-"si FB3"
+the.cells<-"EX"
+the.screen<-"MUS.c"
+wanted.screen<-grepl(the.screen,norm[,"plate"])
+sum(wanted.screen)
+norm<-norm[wanted.screen,]
+unique(norm[,"plate"])
+#####
+
+plates.all<-norm
+the.score<-targets[i]
+the.score
+norm[1:5,the.score]
+norm[1:5,]
+
+dim(plates.all)
+
+confounders.list
+confounders<-plates.all[,"Symbol"] %in% confounders.list
+are.finite<-is.finite(plates.all[,the.score])
+
+filter<-are.finite & !confounders
+if(the.score=="percent_R"){filter<- filter & plates.all[,"R"]>=60} # need mre than 60 red cells to make a judgement
+if(the.score=="RG_over_G"){filter<- filter & plates.all[,"G"]>=50}
+if(the.score=="RG_over_G_Z"){filter<- filter & plates.all[,"G"]>=50}
+if(the.score=="Gr-G1"){filter<- filter & plates.all[,"G"]>=50}
+if(the.score=="RG_over_G_over_EtoH"){filter<- filter & plates.all[,"G"]>=50 & plates.all[,"RG_over_G_over_EtoH"]<=10 }
+
+if(the.score=="Z-all Green"){filter<- filter & plates.all[,"RG_expected"]>=25}
+if(the.score=="Num-cells"){filter<- filter & plates.all[,"RG_expected"]>=100}
+
+dim(plates.all[filter,]) # plates.all[filter & (plates.all[,"Symbol"] %in% pos.control.list ),1:15]
+
+## plates.all[(plates.all[,"Symbol"] %in% pos.control.list ),1:15]
+
+
+labels<-as.character(paste(plates.all[filter,"plate"],"-",plates.all[filter,"row"],plates.all[filter,"col"],"-",plates.all[filter,"Symbol"],sep=""))
+
+xlabels<-as.character(paste(plates.all[filter,"plate"],"-",plates.all[filter,"row"],plates.all[filter,"col"],sep=""))
+
+symbols<-plates.all[filter,"Symbol"]
+plates<-plates.all[filter,"plate"]
+cols<-plates.all[filter,"col"]
+data.in<- plates.all[filter,the.score]
+
+
+pos.control<-symbols %in% pos.control.list
+norm.control<-symbols %in% norm.control.list
+
+
+the.mean<-mean(data.in[!pos.control])
+the.sd<-sd(data.in[!pos.control])
+the.mean
+range(data.in)
+
+qq<- qq.data(data.in,distribution="norm",the.mean=the.mean,the.sd=the.sd,plot.it=FALSE)
+
+my.qq.plot(data.in,distribution="norm",col="blue",xlab="Expected Score",ylab="Observed score",xlim=range(qq$x), ylim=range(data.in),main=paste(the.screen,"with 95% confidence intervals",":",the.score,sep=" "),the.mean=the.mean,the.sd=the.sd,cex.lab=1.5,cex.axis=1.5,cex.main=1.5,cex=1.5)
+
+my.qq.plot(data.in,distribution="norm",col="blue",xlab="Expected Score",ylab="Observed score", xlim=c(1.1,2.2), ylim=c(1,1.4),main=paste(the.screen,"with 95% confidence intervals",":",the.score,sep=" "),the.mean=the.mean,the.sd=the.sd,cex.lab=1.5,cex.axis=1.5,cex.main=1.5,cex=1.5)
+
+## qq<- qq.data(data.in,distribution="norm",the.mean=the.mean,the.sd=the.sd,plot.it=FALSE)  # xlim=c(-20,20), ylim=c(0,5)
+## plates.all[plates.all[,"Symbol"]=="CCND1" ,c(core.ann,"Num-cells")]
+
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% norm.control.list]
+points(qq$x[posns],qq$y[posns],col="cyan",pch=19,cex=1.0)
+
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% pos.control.list ]
+points(qq$x[posns],qq$y[posns],col="red",pch=19,cex=0.85)
+ 
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% pos.control.list2  ]
+points(qq$x[posns],qq$y[posns],col="pink",pch=19,cex=0.85)
+
+posns<-c(1:length(symbols))[(symbols[qq$ord] %in% pos.control.list) & grepl("12",cols[qq$ord]) ]
+points(qq$x[posns],qq$y[posns],col="yellow",pch=21,cex=1.0)
+
+posns<-c(1:length(symbols))[(symbols[qq$ord] %in% norm.control.list) & grepl("12",cols[qq$ord]) ]
+points(qq$x[posns],qq$y[posns],col="gold",pch=21,cex=1.0)
+
+legend(x=0,y=3,legend=c(toString(norm.control.list),toString(pos.control.list),toString(pos.control.list2),"Col:12 -highlight"),col=c("cyan","red","pink","gold"),pch=c(20,20,20,21),cex=1.5)
+
+
+############ if cutoffs are known
+abline(h=the.low.cut,col="red",lwd=2)
+abline(h=the.high.cut,col="red",lwd=2)
+
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% my.hits]
+points(qq$x[posns],qq$y[posns],col="forestgreen",pch=19,cex=1.0)
+
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% other.hits]
+points(qq$x[posns],qq$y[posns],col="green",pch=19,cex=1.0)
+
+#####annotate curve
+selected.data<-identify(qq$x,qq$y,labels=symbols[qq$ord],col="red",cex=1,atpen='TRUE') ##plate row col symbol
+selected.data<-identify(qq$x,qq$y,labels=labels[qq$ord],col="red",cex=1,atpen='TRUE') ## sybmol
+selected.data<-identify(qq$x,qq$y,labels=as.character(round(data.in[qq$ord],2)),col="forestgreen",cex=1.25,atpen='TRUE') # observed score
+#####
+
+abline(h=a.screen.cuts[[the.screen]]$high.cut[the.score],col="red",lwd=2)
+abline(h=a.screen.cuts[[the.screen]]$low.cut[the.score],col="red",lwd=2)
+text(range(qq$x)[1],a.screen.cuts[[the.screen]]$high.cut[the.score],labels=paste("hits>",a.screen.cuts[[the.screen]]$high.cut[the.score],sep=""),pos=3,col="red",cex=1.5)
+text(range(qq$x)[1],a.screen.cuts[[the.screen]]$low.cut[the.score],labels=paste("hits<",a.screen.cuts[[the.screen]]$low.cut[the.score],sep=""),pos=1,col="red",cex=1.5)
+savePlot(filename=paste("Q-Q",the.screen,the.score,"jpeg",sep="."),type="jpeg")
+
+
+targets<-c("S+G2_over_G1","percent_R", "ak_leakage","resazurin","Num-cells")
+
+##SAVE result
+the.low.cut<--2
+sum(data.in<the.low.cut)/length(data.in)
+
+the.high.cut<-2
+sum(data.in>the.high.cut)/length(data.in)
+
+a.screen.cuts[[the.screen]]$low.cut[the.score]<-the.low.cut
+
+a.screen.cuts[[the.screen]]$high.cut[the.score]<-the.high.cut
+
+a.screen.cuts
+a.screen.cuts.temp<-a.screen.cuts
+
+save(list=c("a.screen.cuts"),file="a.screen.cuts.RData")
+
+low.cut<-list()
+low.cut$the.sreen
+
+low.cut<-c(1.05,42,3600,25500,4700)
+high.cut<-c(2.5,65.2,8600,53000,7900)
+names(low.cut)<-targets
+names(high.cut)<-targets
+
+#################save for a screen
+cuts<-list(low.cut=low.cut,high.cut=high.cut)
+ a.screen.cuts[the.screen]<- list(cuts)
+
+
+names(a.screen.cuts)<-targets
+
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+
+
+############## for publication
+## qq<- qq.data(data.in,distribution="norm",the.mean=the.mean,the.sd=the.sd,plot.it=FALSE)
+
+
+## my.qq.plot(data.in,distribution="norm",col="blue",xlab="Expected Score",ylab="Observed score",xlim=range(qq$x), ylim=range(data.in),main="",the.mean=the.mean,the.sd=the.sd,cex.lab=3,cex.axis=2,cex.main=2,cex=2)
+## ## qq<- qq.data(data.in,distribution="norm",the.mean=the.mean,the.sd=the.sd,plot.it=FALSE)  # xlim=c(-20,20), ylim=c(0,5)
+## ## plates.all[plates.all[,"Symbol"]=="CCND1" ,c(core.ann,"Num-cells")]
+
+## posns<-c(1:length(symbols))[symbols[qq$ord] %in% norm.control.list]
+## points(qq$x[posns],qq$y[posns],col="cyan",pch=19,cex=2.0)
+
+## posns<-c(1:length(symbols))[symbols[qq$ord] %in% pos.control.list ]
+## points(qq$x[posns],qq$y[posns],col="red",pch=19,cex=2.0)
+
+## savePlot("Q-Qplot_CCNE1.tiff",type="tiff")
+## savePlot("Q-Qplot_CCNE1.jpeg",type="jpeg")
+
+## legend(x=0,y=3,legend=c(toString(norm.control.list),toString(pos.control.list),toString(pos.control.list2),"Col:12 -highlight"),col=c("cyan","red","pink","gold"),pch=c(20,20,20,21),cex=1.5)
+
+## ########
+###########################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+###################################################################################
+
+
+
+
+
+
+
+################ below for a zoom in 
+
+### HIGH CUT
+abline(h=a.screen.cuts[[the.screen]]$high.cut[the.score],col="red",lwd=2)
+savePlot(filename=paste("Q-Q",the.screen,the.score,"zoom-inUP","jpeg",sep="."),type="jpeg")
+
+
+### LOW CUT
+abline(h=a.screen.cuts[[the.screen]]$low.cut[the.score],col="red",lwd=2)
+savePlot(filename=paste("Q-Q",the.screen,the.score,"zoom-inLOW","jpeg",sep="."),type="jpeg")
+#########################################################################
+#########################################################################
+##############END
+###############################
+plates.all[(plates.all[,"Symbol"] %in% norm.control.list) & plates.all[,"percent_R"]<50 ,c(1:4,21,23,37,43)]
+plates.all[(plates.all[,"Symbol"] %in% pos.control.list) & plates.all[,"percent_R"]>50 ,c(1:4,21,23,37,43)]
+
+
+
+
+################ plots for mcmillian screen
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% norm.control.list]
+points(qq$x[posns],qq$y[posns],col="cyan",pch=19,cex=1.0)
+
+posns<-c(1:length(symbols))[(symbols[qq$ord] %in% norm.control.list) & grepl("si FB3.",plates[qq$ord]) ]
+points(qq$x[posns],qq$y[posns],col="darkcyan",pch=21,cex=1.0)
+
+posns<-c(1:length(symbols))[(symbols[qq$ord] %in% norm.control.list) & grepl("_1",plates[qq$ord]) ]
+points(qq$x[posns],qq$y[posns],col="gold",pch=21,cex=1.0)
+
+posns<-c(1:length(symbols))[(symbols[qq$ord] %in% norm.control.list) & grepl("_2",plates[qq$ord]) ]
+points(qq$x[posns],qq$y[posns],col="magenta",pch=21,cex=1.0)
+
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% pos.control.list  & !(grepl("_3.",plates[qq$ord]) & symbols[qq$ord] %in% pos.control.list)   ]
+points(qq$x[posns],qq$y[posns],col="red",pch=19,cex=0.85)
+ 
+posns<-c(1:length(symbols))[symbols[qq$ord] %in% pos.control.list2  ]
+points(qq$x[posns],qq$y[posns],col="pink",pch=19,cex=0.85)
+
+
+legend(x=40,y=75,legend=c(toString(norm.control.list),toString(pos.control.list),toString(pos.control.list2),"CASKI-highlighted","Plate1","Plate2"),col=c("cyan","red","pink","black","gold","magenta"),pch=c(20,20,20,21,21,21),cex=1.5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+text(60,20,labels="Mean:50, Stand. Dev:10",cex=1.5)
+
+pos.control<-plates.all[,"Symbol"]=="CCNE1" | plates.all[,"Symbol"]=="101-CCNE1" | plates.all[,"Symbol"]=="411-CCNE1" | plates.all[,"Symbol"]=="101-CYCD2"
+#posns<-c(1:length(symbols))[symbols[qq$ord] %in% c("ATP2C1")] ###### CA SCREEN
+lowRG<-RGs[qq$ord][posns]<29
+points(qq$x[posns[!lowRG]],qq$y[posns[!lowRG]],col="green",pch=19,cex=1.5)
+#GFP no good at all
+#PLK1 should kill all but is variable
+#ATP2C1 increase proliferation ?
+#empty
+#posns<-grep("NT",labels[qq$ord]) # CA SCREEN
+posns<-grep("PLV101",labels[qq$ord])
+lowRG<-RGs[qq$ord][posns]<RG.expected.min # set during normalization typicall7 50
+points(qq$x[posns[!lowRG]],qq$y[posns[!lowRG]],col="cyan",pch=19,cex=1.5)
+#points(qq$x[posns[lowRG]],qq$y[posns[lowRG]],col="cyan",pch=21,lwd=2)
+
+
+subset<-conf.screen.norm[conf.norm.hits.posns[[a.score[the.score]]],c("plate","Validated","row","col",the.score)]
+subset<-subset[subset[,"Validated"]=="N",c("plate","row","col",the.score)]
+subset.xlabels<-as.character(paste(subset[,"plate"],subset[,"row"],subset[,"col"],sep=""))
+posns<-c(1:length(xlabels))[xlabels[qq$ord] %in%  subset.xlabels]
+points(qq$x[posns],qq$y[posns],col="green",pch=19,cex=1.5)
+abline(h=a.cut[the.score],col="forestgreen",lwd=2)
+
+subset<-conf.screen.norm[conf.norm.hits.posns[[a.score[the.score]]],c("plate","Validated","row","col",the.score)]
+subset<-subset[subset[,"plate"]<=15,c("plate","Validated","row","col",the.score)]
+subset<-subset[subset[,"Validated"]=="Y",c("plate","row","col",the.score)]
+subset.xlabels<-as.character(paste(subset[,"plate"],subset[,"row"],subset[,"col"],sep=""))
+posns<-c(1:length(xlabels))[xlabels[qq$ord] %in%  subset.xlabels]
+points(qq$x[posns],qq$y[posns],col="forestgreen",pch=19,cex=1.5)
+
+
+
+
+savePlot(filename=paste("Q-Q -joseph with confirmation2",the.score,"jpeg",sep="."),type="jpeg")
+savePlot(filename=paste("Q-Q -joseph with confirmation2",the.score,"tiff",sep="."),type="tiff")
+
+##### Ca screen
+legend(20,80,legend=c("NT","PLK1","ATP2C1"),col=c("cyan","red","green"),pch=20,cex=2)
+text(60,20,labels="Mean:50, Stand. Dev:10",cex=1.5)
+
+legend(4.75,22,legend=c("PLV101","Positive Control","Confirmed","Not Confirmed"),col=c("cyan","red","forestgreen","green"),pch=19,cex=2.0,bty="n")
+
+legend(6,16,legend=c("PLV101","Positive Control"),col=c("cyan","red"),pch=19,cex=2.0)
+legend(-10,20,legend=c("PLV101","Positive Control"),col=c("cyan","red"),pch=19,cex=2.0)
+abline(h=25000,col="forestgreen",lwd=2)
+text(-1,9.5,labels=c("Cut at Z-Low=8.9"),pos=4,cex=1.5,col="forestgreen")
+
+############################# DRAW levels
+
+selected.data<-identify(qq$x,qq$y,labels=as.character(round(data.in[qq$ord],3)),col="forestgreen",font=2,cex=1.5,offset=1,atpen='TRUE',plot=TRUE)
+savePlot(filename=paste(the.screen,"Normalized Q-Q Plot for",the.score,"jpeg",sep="."),type="jpeg")
+
+savePlot(filename=paste("Q-Q -joseph LOW plv1o1 and controls",the.score,"jpeg",sep="."),type="jpeg")
+savePlot(filename=paste("Q-Q -joseph LOW plv1o1 and controls ZOOM2",the.score,"jpeg",sep="."),type="jpeg")
+
+selected.data<-identify(qq$x,qq$y,labels=labels[qq$ord],col="red",cex=1,atpen='TRUE')
+
+
+ test<-plates.all[11445:11450,c(core.ann,"resazurin")]
+pos.control
+
+pos.control<-test[,"Symbols"]%in% pos.control.list
+norm.control<-symbols %in% norm.control.list
+test[(test[,"Symbol"]=="PLK1" & test[,"resazurin"] >15400 & test[,"resazurin"]< 27500 ),1:4]
+
+plates.all[(plates.all[,"Symbol"]=="PLK1" & plates.all[,"resazurin"] >15400 & plates.all[,"resazurin"]< 27500 ),1:4]
+## subset<- kiril.norm[kiril.norm.hits.posns$z.low,c("plate","row","col","Z-Low Green")]
+## subset<-subset[subset[,"plate"]<=15,c("plate","row","col","Z-Low Green")]
+## subset<-subset[subset[,"Z-Low Green"]>10,c("plate","row","col","Z-Low Green")]
+## subset.xlabels<-as.character(paste(subset[,"plate"],subset[,"row"],subset[,"col"],sep=""))
+## posns<-c(1:length(xlabels))[xlabels[qq$ord] %in%  subset.xlabels]
+## points(qq$x,qq$y,col="magenta",pch=21)
+
+cuts<-c(0.9,0.7,0.7,0.7,27) # q-q cuts for JOseph UNnormalized
+cuts<-c(9.0,8.9,8.0,8.0,27) # q-q cuts for Joseph Normalized
+
+cuts<-c(6.0,6.7,7.5,13,21) # q-q cuts for Kiril UNnormalized
+cuts<-c(10.0,10.0,12.0,12.0,27) # q-q cuts for Kiril Normalized
+
+
+ ##########################
+my.qq.plot<-function (x, distribution = "norm", ylab = deparse(substitute(x)),
+    xlab = paste(distribution, "quantiles"), main = NULL, las = par("las"), 
+    envelope = 0.95, labels = FALSE, col = palette()[2], lwd = 2, the.mean=0,the.sd=1,cex.lab=2,
+    pch = 1, cex = 1, line = c("quartiles", "robust", "none"),xlim=c(0,100),ylim=c(0,20),font.lab=2,font.axis=2,font.main=2,cex.axis=1,cex.main=1,
+    ...)
+{
+    result <- NULL
+    line <- match.arg(line)
+    good <- !is.na(x)
+    ord <- order(x[good])
+    ord.x <- x[good][ord]
+    q.function <- eval(parse(text = paste("q", distribution, 
+        sep = "")))
+    d.function <- eval(parse(text = paste("d", distribution, 
+        sep = "")))
+    n <- length(ord.x)
+    P <- ppoints(n)
+    z <- q.function(P, mean=the.mean, sd=the.sd, ...)
+    plot(z, ord.x, xlab = xlab, ylab = ylab, main = main, las = las, 
+        col = col, pch = pch,cex = cex,xlim=xlim,ylim=ylim,cex.lab=cex.lab,font.lab=font.lab,font.axis=font.axis,font.main=font.main,cex.main=cex.main,cex.axis=cex.axis)
+    if (line == "quartiles") {
+        Q.x <- quantile(ord.x, c(0.25, 0.75))
+        Q.z <- q.function(c(0.25, 0.75), mean=the.mean, sd=the.sd, ...)
+        b <- (Q.x[2] - Q.x[1])/(Q.z[2] - Q.z[1])
+        a <- Q.x[1] - b * Q.z[1]
+        abline(a, b, col = "red", lwd = lwd)
+    }
+    if (line == "robust") {
+        if (!require("MASS")) 
+            stop("MASS package not available")
+        coef <- coefficients(rlm(ord.x ~ z))
+        a <- coef[1]
+        b <- coef[2]
+        abline(a, b)
+    }         ###################  Envelope function
+    if (line != "none" & envelope != FALSE) {
+        zz <- qnorm(1 - (1 - envelope)/2)
+        SE <- (b/d.function(z, mean=the.mean, sd=the.sd, ...)) * sqrt(P * (1 - P)/n)
+        fit.value <- a + b * z
+        upper <- fit.value + zz * SE
+        lower <- fit.value - zz * SE
+        lines(z, upper, lty = 2, lwd = lwd/2, col = "red")
+        lines(z, lower, lty = 2, lwd = lwd/2, col = "red")
+    }       #####################
+    if (labels[1] == TRUE & length(labels) == 1)
+        labels <- seq(along = z)
+    if (labels[1] != FALSE) {
+        selected <- identify(z, ord.x, labels[good][ord])
+        result <- seq(along = x)[good][ord][selected]
+    }
+    if (is.null(result)) 
+        invisible(result)
+    else sort(result)
+}
+
+
+
+
+
+
+      qq.data<- function (x, plot.it = TRUE, distribution = "norm", df=1, the.mean=0, the.sd=1,  xlab = deparse(substitute(x)),
+    ylab = deparse(substitute(y)) , ...)
+{
+    good <- !is.na(x)
+    ord <- order(x[good])
+    ord.x <- x[good][ord]
+    q.function <- eval(parse(text = paste("q", distribution, 
+        sep = "")))
+    n <- length(ord.x)
+    P <- ppoints(n)
+    z <- q.function(P, mean=the.mean, sd=the.sd, ...)
+
+    if (plot.it)
+        plot(z, ord.x, xlab = xlab, ylab = ylab, ...)
+    invisible(list(x = z, y = ord.x, ord=ord))
+}
+
+
+#####################################################################################################################
+#####################################################################################################################
+#######################################################
+
+to.box<-plates.all[filter.plv,c("plate","%R")]
+colnames(to.box)<-c("x","y")
+boxplot(y~x,data=to.box,ylab="%R",xlab="Plate",main="For PLV101s with RG >50")
+savePlot("Boxplot %R for PLV101 all plates.jpeg",type="jpeg")
+
+to.box<-plates.all[filter.plv,c("plate",the.score)]
+colnames(to.box)<-c("x","y")
+boxplot(y~x,data=to.box,ylab=the.score,xlab="Plate",main="For PLV101s with RG >50")
+savePlot(paste("Boxplot ",the.score," for PLV101 all plates.jpeg",sep=""),type="jpeg")
+
+to.box<-plates.all[filter.plv,c("plate","RG/G")]
+colnames(to.box)<-c("x","y")
+to.box[,"y"]<-to.box[,"y"]*100
+boxplot(y~x,data=to.box,ylab="%RG/G",xlab="Plate",main="For PLV101s filtered with RG >50")
+savePlot("Boxplot %RG for PLV101 all plates.jpeg",type="jpeg")
+
+to.box<-plates.all[filter.plv,c("plate","Total")]
+colnames(to.box)<-c("x","y")
+to.box[,"y"]<-to.box[,"y"]*100
+boxplot(y~x,data=to.box,ylab="Total",xlab="Plate",main="For PLV101s filtered with RG >50")
+savePlot("Boxplot Total cells for PLV101 all plates.jpeg",type="jpeg")
+
+
+to.box<-plates.all[filter,c("plate","%R")]
+colnames(to.box)<-c("x","y")
+boxplot(y~x,data=to.box,ylab="%R",xlab="Plate",main="For filtered with RG >50")
+savePlot("Boxplot %R for all plates.jpeg",type="jpeg")
+
+to.box<-plates.all[filter,c("plate",the.score)]
+colnames(to.box)<-c("x","y")
+boxplot(y~x,data=to.box,ylab=the.score,xlab="Plate",main="For filtered with RG >50")
+savePlot(paste("Boxplot ",the.score," for all plates.jpeg",sep=""),type="jpeg")
+
+to.box<-plates.all[filter,c("plate","RG/G")]
+colnames(to.box)<-c("x","y")
+to.box[,"y"]<-to.box[,"y"]*100
+boxplot(y~x,data=to.box,ylab="%RG/G",xlab="Plate",main="For filtered with RG >50")
+savePlot("Boxplot %RG for all plates.jpeg",type="jpeg")
+
+to.box<-plates.all[filter,c("plate","Total")]
+colnames(to.box)<-c("x","y")
+to.box[,"y"]<-to.box[,"y"]*100
+boxplot(y~x,data=to.box,ylab="Total",xlab="Plate",main="For filtered with RG >50")
+savePlot("Boxplot Total cells for all plates.jpeg",type="jpeg")
+
+
+
+#,notch=TRUE)
+boxplot(y~x,data=plates.all[filter.plv,])
+#data.plate<-(plates.all[filter ,c("plate",the.score)])
+plates.all[(plates.all[,"Symbol"]=="PLV101" | plates.all[,"Symbol"]=="plv101"),]
+plates.all[(plates.all[,"Symbol"]=="PLV101" | plates.all[,"Symbol"]=="plv101") & plates.all[,"plate"]==19 ,1:24]
+plates.all[(plates.all[,"Symbol"]=="PLV101" | plates.all[,"Symbol"]=="plv101") & plates.all[,"plate"]==25 ,1:24]
+

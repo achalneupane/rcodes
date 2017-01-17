@@ -1,0 +1,3205 @@
+
+R version 2.15.0 (2012-03-30)
+Copyright (C) 2012 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> 
+> library(GenomicFeatures)
+Loading required package: BiocGenerics
+
+Attaching package: ‘BiocGenerics’
+
+The following object(s) are masked from ‘package:stats’:
+
+    xtabs
+
+The following object(s) are masked from ‘package:base’:
+
+    anyDuplicated, cbind, colnames, duplicated, eval, Filter, Find,
+    get, intersect, lapply, Map, mapply, mget, order, paste, pmax,
+    pmax.int, pmin, pmin.int, Position, rbind, Reduce, rep.int,
+    rownames, sapply, setdiff, table, tapply, union, unique
+
+Loading required package: IRanges
+Loading required package: GenomicRanges
+Loading required package: AnnotationDbi
+Loading required package: Biobase
+Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.
+
+
+R version 2.15.0 (2012-03-30)
+Copyright (C) 2012 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> 
+> library(GenomicFeatures)
+Loading required package: BiocGenerics
+
+Attaching package: ‘BiocGenerics’
+
+The following object(s) are masked from ‘package:stats’:
+
+    xtabs
+
+The following object(s) are masked from ‘package:base’:
+
+    anyDuplicated, cbind, colnames, duplicated, eval, Filter, Find,
+    get, intersect, lapply, Map, mapply, mget, order, paste, pmax,
+    pmax.int, pmin, pmin.int, Position, rbind, Reduce, rep.int,
+    rownames, sapply, setdiff, table, tapply, union, unique
+
+Loading required package: IRanges
+Loading required package: GenomicRanges
+> library(multicore)
+> library(Rsamtools)
+Loading required package: Biostrings
+> 
+> extractReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=FALSE,
++                                          isDuplicate=NA),
++                         what=c("rname", "pos", "cigar"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   ## Note that unmapped reads and reads that are PCR/optical duplicates
++   ## have already been filtered out by using the ScanBamParam object above.
++   irl <- cigarToIRangesListByRName(bam$cigar, bam$rname, bam$pos)
++   irl <- irl[elementLengths(irl) != 0]  # drop empty elements
++   irl
++ }
+> 
+> extractUnmappedReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=TRUE), what=c("qname"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   bam #bam$qname[1:5]
++ }
+> 
+> extract.value.from.info<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,\\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.format<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9\\ \\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.DS<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,:\\+\\ \\.\\-]*",sep="")  #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> ## the.readgroup["DS",]
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Lane:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="ParticipantCode:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:")
+> 
+> 
+> #non.project.directories<-c("Genomes","R-codes","annovar","Sequence_Reads","scripts","bcos_srv"
+>                          
+> 
+> get.readgroup.info<-function(sample.bam,readgroup.labels=c("ID","PL","LB","DS","SM")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   readgroup.cols<- {}
++ 
++   i.ar<-1
++   for(ib in 1:length(the.bam.files)){  ## perhaps different BAm files
++   ## the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@RG"]] # this only provides the FIRST RG
++   the.readgroup.list<-the.header[[the.bam.files[ib]]][["text"]][names(the.header[[the.bam.files[ib]]][["text"]])=="@RG"] ## perhaps many RG per BAm file
++ 
++   for(iread in 1:length(the.readgroup.list)){  # loop over RG
++   the.readgroup<-the.readgroup.list[[iread]]
++ 
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++ 
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])} #get rid of label from text
++   names(the.readgroup)<-the.RG.desc
++   
++   if(i.ar==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup[readgroup.labels,],the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++ 
++   ############### fix the capture technology labels ";" delinates label seperators 
++    if(is.na(a.readgroup["DS",i.ar])){a.readgroup["DS",i.ar]<-"NA"}  # so can just match with text later
++    a.readgroup["DS",i.ar]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX3","TruD:NimX3",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;Agl1.2","TruD:Agl1.2",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar]) # special fix  ;Description:Exome;
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtX","NxtD:NxtX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXR","NxtD:NxtXR",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXE","NxtD:NxtXE",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub(";Description:Exome;",";Description:TruD:NimX;",a.readgroup["DS",i.ar]) # special fix
++    ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   if(!grepl("^NA",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtX",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXR",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXE",a.readgroup["DS",i.ar])     & !grepl("TruD:Agl1.2",a.readgroup["DS",i.ar]) & !grepl("TruD:TruX",a.readgroup["DS",i.ar]) & !grepl("TruD:NimX",a.readgroup["DS",i.ar]) & !grepl("TruD;",a.readgroup["DS",i.ar]) ){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++   
++   i.ar<-i.ar+1
++     }}
++ colnames(a.readgroup)<-readgroup.cols
++   
++  a.readgroup
++ }
+> 
+> get.genome.info<-function(sample.bam,readgroup.labels=c("AS")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   for(ib in 1:length(the.bam.files)){
++   the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@SQ"]] ##only gets the first one
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])}
++   names(the.readgroup)<-the.RG.desc
++ 
++     if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup,the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++   }
++   
++   ## if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];colnames(a.readgroup)[1]<-the.bam.files[ib]}
++   ## else{a.readgroup[names(the.readgroup),ib]<-the.readgroup;colnames(a.readgroup)[ib]<-the.bam.files[ib]}
++   ##   }
++   
++   ##  a.readgroup["DS",ib]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",ib]) # special fix
++   ##  a.readgroup["DS",ib]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",ib]) # special fix
++   ##  ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   ## if(!is.na(a.readgroup["DS",ib]) & (!grepl("TruD:TruX",a.readgroup["DS",ib]) & !grepl("TruD:NimX",a.readgroup["DS",ib]) & !grepl("TruD;",a.readgroup["DS",ib]) )){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++  colnames(a.readgroup)<-readgroup.cols
++ for(ic in 1:dim(a.readgroup)[2]){a.readgroup[is.na(a.readgroup[,ic]),ic]<-"NA"} # replace NA by "NA"
++   a.readgroup
++ }
+> 
+> # sample.bam<-sample.bams[i]
+> get.targets.file<-function(sample.bam){
++ 
++ the.readgroup<-get.readgroup.info(sample.bam) # colnames is the bam file
++ the.genome<-get.genome.info(sample.bam)  # colnames is the bam file
++ the.capture<-extract.value.from.DS(the.readgroup["DS",],match.string="Description:")                                      # colnames is the bam file
++ names(the.capture)<-colnames(the.readgroup)
++ 
++ a.targets.file <- list()
++ 
++ for(i in 1:dim(the.readgroup)[2]){
++   targets.file<-NA
++   from.bam<-colnames(the.readgroup)[i]
++ 
++ ################ Define different capture technologyies used  
++ if(( the.genome["AS",from.bam]=="UCSC_ALL_FULL_CHROMS_HG19.nix") | (the.genome["AS",from.bam]=="NA") ){  # a hg19 genome
++     the.ref.genome<-"hg19";the.ref.genome.library<-"BSgenome.Hsapiens.UCSC.hg19"; the.ref.genome.object<-"Hsapiens" # used to get chromsome lengths
++     if(the.capture[from.bam]=="TruD:TruX"){targets.file<-"Human_Exome_Targets_illumina_v2_hg19_targets.RData"}
++     if(the.capture[from.bam]=="TruD:NimX"){targets.file<-"Human_Exome_Targets_Nimble_v2_hg19_targets.RData"} #(version=="v2")
++     if(the.capture[from.bam]=="TruD:NimX3"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2")TruD;Agl1.2
++     if(the.capture[from.bam]=="TruD:Agl1.2"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2"
++     if(the.capture[from.bam]=="NxtD:NxtX"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXE"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXR"){targets.file<-"NexteraRapidCapture_Exome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]==""){targets.file<-"Human_Exome_Targets_Nimble_v1_hg19_targets.RData"} #(version=="v1")
++ }
++   
++ if(the.genome["AS",from.bam]=="mm9.nix"){
++   the.ref.genome<-"mm9";the.ref.genome.library<-"BSgenome.Mmusculus.UCSC.mm9"; the.ref.genome.object<-"Mmusculus"
++  if(the.capture[from.bam]=="TruD:NimX"){ targets.file<-"Mouse_Exome_Targets_Nimble_v100803_targets.RData"}
++ }
++ ###############
++ 
++ a.target.info<-list(targets.file=targets.file,the.ref.genome=the.ref.genome,the.ref.genome.library=the.ref.genome.library,the.ref.genome.object=the.ref.genome.object)
++ 
++ if(i==1){a.targets.file<-list(a.target.info)}else{a.targets.file<-c(a.targets.file,list(a.target.info))}
++ }
++ 
++ 
++ 
++ names(a.targets.file)<-colnames(the.readgroup)
++ a.targets.file
++ }
+> 
+> 
+> 
+> basesAboveThreshold<-function(x,thresh=0){sum(x>=thresh)}
+> 
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> 
+> 
+> options(show.error.messages = TRUE)
+> possible.capture.methods<-c("TruD:TruX","TruD:NimX","TruD:NimX3","TruD:Agl1.2","NA","NxtD:NxtXE","NxtD:NxtXR")
+> UQCCG.data<-"/mnt/UQCCG/Sequencing/Projects"
+> the.genome<-"hg19" ## the.genome<-"mm9"
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> ############
+> restrict.analysis<-TRUE
+> restrict.to.projects<- c("RSGB_AML")        #AOGC FMHT-N,FTP 
+> restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> #############        
+> 
+> 
+> ## ############
+> ## restrict.analysis<-FALSE
+> ## restrict.to.projects<- ""        #AOGC FMHT-N,FTP 
+> ## restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> ## the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> ## #############
+> 
+> 
+> #############
+> 
+> 
+> genomes.path<-"/mnt/UQCCG/Sequencing/Data/Genomes/hg19" ## path to genomes files
+> force.redo.with.new.ranges<-FALSE # force.redo.with.new.ranges<-TRUE # set true is want to recalculate
+> extend.exons<-200 # all to exons start/end to get additional coverage
+> ##### need to choose one of the below:
+> 
+> 
+> ############################################################################
+> 
+> non.exome.projects<-c("AML-PacBio","BTCK","ALSPAC","AS-WGS","PLD","PLD-whole genome","AML-GENOME","bcos_srv","Mowry","QBI-DISC1")
+> 
+> 
+> 
+> ######################################## no need to change below ###################
+> all.QC.column.labels<-c("ID","Sample","Recipe","Capture.Method","Lane","Run","target_file","total_reads","total_mapped_reads","total_dup_reads","unmapped_reads","total.bases",paste("on.target.bases.",extend.exons,"bp",sep=""),"on.target.bases", "percent.on.target.bases","median.max.coverage", "median.mean.coverage","mean.mean.coverage","percent.ccds.gt.1","percent.ccds.gt.5","percent.ccds.gt.10","percent.ccds.gt.15","percent.ccds.gt.30","percent_Duplicated","percent_Unmapped","Description")
+> 
+> projects<-dir(UQCCG.data)
+> projects<-projects[!(projects %in% non.exome.projects)]
+> projects
+ [1] "2013-06_SKDP_Run"             "2013-12_SKDP_Run"            
+ [3] "ALSPAC_MOVED_di-rdr"          "AML-exome"                   
+ [5] "AML-GENOME_MOVED_di-rdr"      "AML-PacBio_MOVED_TO_TRI"     
+ [7] "AOGC-NGS"                     "Chinese Controls from tulane"
+ [9] "Ch_MND_F"                     "Ch_MND_S"                    
+[11] "DISH"                         "FMHT"                        
+[13] "FMHT-N"                       "IYMD-Lung"                   
+[15] "MODY"                         "new_SKDP-SD"                 
+[17] "NSOG"                         "P01.zip"                     
+[19] "PCC"                          "QIMR-GCJL"                   
+[21] "QIMR-GCJL_MOVED_di-rdr"       "RNSH"                        
+[23] "RSGB_AML"                     "SKDP"                        
+[25] "SKDP-ARGP"                    "SKDP-FAM-10"                 
+[27] "SKDP-FAM-11"                  "SKDP-FAM-12"                 
+[29] "SKDP-FAM-121"                 "SKDP-FAM-13"                 
+[31] "SKDP-FAM-16"                  "SKDP-FAM-168"                
+[33] "SKDP-FAM-171"                 "SKDP-FAM-178"                
+[35] "SKDP-FAM-183"                 "SKDP-FAM-2"                  
+[37] "SKDP-FAM-209"                 "SKDP-FAM-24"                 
+[39] "SKDP-FAM-26"                  "SKDP-FAM-31"                 
+[41] "SKDP-FAM-36"                  "SKDP-FAM-38-Melorheostosis"  
+[43] "SKDP-FAM-4"                   "SKDP-FAM-40"                 
+[45] "SKDP-FAM-41"                  "SKDP-FAM-42"                 
+[47] "SKDP-FAM-44"                  "SKDP-FAM-49"                 
+[49] "SKDP-FAM-51"                  "SKDP-FAM-57"                 
+[51] "SKDP-FAM-6"                   "SKDP-FAM-61"                 
+[53] "SKDP-FAM-66"                  "SKDP-FAM-7"                  
+[55] "SKDP-FAM-70-RUSP"             "SKDP-FAM-71"                 
+[57] "SKDP-FAM-76"                  "SKDP-FAM-77"                 
+[59] "SKDP-FAM-78"                  "SKDP-FAM-80-FOP"             
+[61] "SKDP-FAM-84-Marfan"           "SKDP-FAM-9"                  
+[63] "SKDP-FAM-90"                  "SKDP-FAM-92"                 
+[65] "SKDP-FAM-99"                  "SKDP-FMDP"                   
+[67] "SKDP-MCTO"                    "SKDP-OI"                     
+[69] "SKDP-OI-TypeV"                "SKDP-SD"                     
+[71] "SKDP-SD-OLD"                  "SKDP-SRP"                    
+[73] "TBX21annotation"              "TGCM-AML"                    
+[75] "tulane-FRENCE-control-data"  
+> ##
+> 
+> all.data<-{}
+> count<-0
+> 
+> 
+> if(restrict.analysis){
++   projects<-projects[projects %in% restrict.to.projects]
++ }
+> 
+> print(projects)
+[1] "RSGB_AML"
+> targets.file.ori<-""
+> ####### ip<-1
+> for(ip in 1:length(projects)){
++ print(projects[ip])
++ on.target.stats<-{}  # this will be rebuilt from the individual 
++ 
++ BAM.directory<-paste(UQCCG.data,projects[ip],"BAM",sep="/")
++ x<-try(setwd(BAM.directory ))
++ if(inherits(x, "try-error")){next}
++ 
++ QC.root.directory<-paste(UQCCG.data,projects[ip],"QC",sep="/")
++ xx<-try(setwd( QC.root.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.root.directory,sep=" "));setwd( QC.root.directory  )}
++ 
++ 
++ QC.directory<-paste(UQCCG.data,projects[ip],"QC/AlignedQC",sep="/")
++ xx<-try(setwd( QC.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.directory,sep=" "));setwd( QC.directory);QC.files<-dir(getwd())}else{QC.files<-dir(getwd())}
++   ## QC.files<-QC.files[grepl(".QC$",QC.files)]
++ 
++ 
++ setwd(BAM.directory)
++ files<-dir(getwd())
++ sample.bams<-files[grepl(".bam$",files)] # sample.bams<-sample.bams.ori[48:132] # sample.bams<-sample.bams.ori[1:47] # sample.bams.ori<-sample.bams
++ 
++ if((restrict.to.run=="INCLUDE") | (restrict.to.run=="EXCLUDE")){
++   if(restrict.to.run=="INCLUDE"){
++     wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[wanted]
++   }
++   if(restrict.to.run=="EXCLUDE"){
++         wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[!wanted]
++   }}
++ 
++ print(sample.bams)
++ 
++ 
++ k<-1
++ all.readgroup<-get.readgroup.info(sample.bams)
++ all.genome<-get.genome.info(sample.bams)
++ all.target.files<-get.targets.file(sample.bams)
++   
++ 
++ duplicated.samples<-all.readgroup["SM",][duplicated(all.readgroup["SM",])]
++ 
++  #  merged BAM files with same SM can make 3 apparent files **coverage done at BAM file level not SM level**
++ if(length(names(duplicated.samples)) > length(unique(names(duplicated.samples)) )){
++ duplicated.samples<-duplicated.samples[!duplicated(names(duplicated.samples))] # only unique BAm files
++ duplicated.samples<-duplicated.samples[duplicated(duplicated.samples)] # duplicated samples
++ }
++ 
++ ### added by Mhairi - Jan 2013
++ duplicated.samples <- unique(duplicated.samples)
++ 
++   if(length(duplicated.samples)==0){next}
++ ## 
++ i <- 1
++ #for(i in 1:length(duplicated.samples)){
++   
++ sample.output<-paste(duplicated.samples[i],".combined.ReCal.sort.QC",sep="")   # names of file data is saved to
++ 
++ the.readgroup<-all.readgroup[,all.readgroup["SM",]==duplicated.samples[i] ]
++ the.bam.files<-colnames(the.readgroup)
++ bam.roots<-dirname((the.bam.files))
++ sample.bam.counts<-paste(gsub(".bam$","",basename((the.bam.files))),"QC",sep=".")
++ cov.objects<-paste(sample.bam.counts,"regions.RData",sep=".")
++ names(cov.objects)<-the.bam.files
++ 
++ ######### check the cov.objects exist ##
++ cov.objects<-cov.objects[cov.objects %in% QC.files]
++ 
++ 
++   ###################### already run so skip out
++ if(!force.redo.with.new.ranges){
++   
++ if( (sample.output %in% QC.files) ){ ## probably has been done
++   QC.file.chk<-read.delim(paste(QC.directory,sample.output,sep="/"),header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
++   present<-rownames(QC.file.chk) %in% all.QC.column.labels 
++   QC.file.chk<-subset(QC.file.chk,subset=present)  ### Get rid of extra informtion that might  have been collected
++   
++   if( ("ID" %in% rownames(QC.file.chk)) & ("Capture.Method"  %in% rownames(QC.file.chk)) &  sum(all.QC.column.labels %in% rownames(QC.file.chk))==length(all.QC.column.labels)   ){ # this file has been processed and is ok
++        if( is.null(on.target.stats) ){ on.target.stats<-as.matrix(QC.file.chk[all.QC.column.labels,])}else{on.target.stats<-cbind(on.target.stats,QC.file.chk[all.QC.column.labels,])} # complile on.target.stats
++        print(paste(duplicated.samples[i],"DONE",sep=" "))
++        next# now force skip of analysis below
++                    } 
++ }else{print(paste(duplicated.samples[i],"NOT combined running",sep=" "))}
++ 
++ } # end force redo
++ ##########################
++ 
++ 
++ 
++  ############### load ths coverage objects and check they are up to date
++ 
++  ############### NOte they could be on different genomes with different chromsomes definitions so addition of cov objects could fail the chr hanes are from the targets file
++  ############## so a cov object with all chromsomes is made
++ ############# NOte cov object of different lensthsor with different names can't be simply added together
++ 
++  
++ setwd(QC.directory)
++ old.cov.object<-rep(FALSE,times=length(cov.objects))
++  cov.all<-{}
++  data.all<-{}
++ for(ic in 1:length(cov.objects)){
++   print(cov.objects[ic])
++   load(cov.objects[ic])
++   if( !( ("ID" %in% rownames(data)) & ("Capture.Method"  %in% rownames(data)) &  sum(all.QC.column.labels %in% rownames(data))==length(all.QC.column.labels)    ) ){old.cov.object[ic]<-TRUE;next} #the data object denotes it is old
++   if(is.null(cov.all)){cov.all<-cov;chrs.known<-names(cov.all)}else{
++     new.chrs<-names(cov)
++     common.chrs<-new.chrs[new.chrs %in% chrs.known]
++     new.chrs<-new.chrs[!(new.chrs %in% chrs.known)]
++     if(length(common.chrs)>0){
++       for(icc in 1:length(common.chrs)){ cov.all[common.chrs[icc]]<- cov.all[common.chrs[icc]] +  cov[common.chrs[icc]] } # all together chromosomes
++        }
++     if(length(new.chrs)>0){cov.all<-c(cov.all,cov[new.chrs]);print(paste("WARNING new chromosomes:",toString(new.chrs),"WITHIN:", toString(cov.objects),sep=" ")) }
++        } # new cove object 
++   if(is.null(data.all)){data.all<-data}else{data.all<-cbind(data.all,data)}
++ }
++ cov<-cov.all
++ data.all
++ sum(old.cov.object)
++ 
++ cov.objects<-cov.objects[!old.cov.object]
++ rm(cov.all)
++ rm(the.counts)
++  
++ 
++ if(length(cov.objects)<2){next} # there are not enough RDATA files to proceed
++ 
++ 
++ the.readgroup<-the.readgroup[,names(cov.objects)]
++ the.genome<-all.genome[,names(cov.objects)]
++ the.target.files<-all.target.files[names(cov.objects)]
++                              
++ the.sample<-duplicated.samples[i]
++ 
++ the.current.bam<-paste(the.bam.files,collapse=";")
++   
++ a.run<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="FCID:"),collapse=";") # runID
++ ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:"),collapse=";") # genome ref
++ a.lane<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="Lane:"),collapse=";") # LAne
++ a.capture<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Description:"),collapse=";") # capture.tech
++ a.recipe<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:"),collapse=";") # recipe
++ a.sample<-the.sample
++ a.sample.ID<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:"),collapse=";")  # ID
++ a.DS<-paste(the.readgroup["DS",],collapse=";")
++ 
++ 
++  num.genomes.same<-length(unique(the.genome))
++ if(num.genomes.same>1){print(paste("ERROR for",toString(the.bam.files),"genomes differ can't combine",sep=" "));next}
++ 
++  ####################### find the lost inclusive target file and determine it's position in 
++ possible.targets<- extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
++ num.possible.targets<-length(unique(the.genome))
++ if(num.possible.targets==1){ii<-1}else{
++ # possible.capture.methods<-c("TruD:TruX","TruD:NimX","NA") # defined above
++   posns<-match( possible.targets,capture.methods)
++   ii<-which.min(posns)
++ }  #ii not contains the best targets option 
++ 
++   
++   ########################################
++ 
++ targets.file<-the.target.files[[ii]]$targets.file
++   if(is.na(targets.file)){print("ERROR targets file not obtained");next}
++ 
++ if(targets.file != targets.file.ori){
++   load(paste(genomes.path,targets.file,sep="/"))
++   package<-the.target.files[[ii]]$the.ref.genome.library
++   library(package,character.only=TRUE)
++   the.chroms<-seqlengths(eval(as.name(the.target.files[[ii]]$the.ref.genome.object)))
++ 
++   genome(data.gr)<-the.target.files[[ii]]$the.ref.genome
++   gr<-data.gr
++ 
++   rl.from.gr<-as(data.gr, "RangesList") # data.gr contains
++   rl.from.gr.expanded<-rl.from.gr+extend.exons
++   rl.from.gr.expanded<-reduce(rl.from.gr.expanded)
++   targets.file.ori<-targets.file
++ }
++ 
++ human.chromlens<-the.chroms[names(cov)]
++ if(length(human.chromlens)<15){
++   print("WARNING fewer than expected chomosomes")
++   if(length(human.chromlens)<1){ print("ERROR NO chomosomes");next}
++    }
++ 
++ ##   paramAll <- ScanBamParam(scanBamFlag(isUnmappedQuery=NA, isDuplicate=NA, isPaired=NA),what=c("rname"))
++ ## all.reads<-countBam(the.bam.files[ii],param=paramAll) # same as  (total.reads+total.unmapped.reads+total.dup.reads)
++ ##############the reads contain all the sequence reads 
++ total.reads<-sum(as.numeric(as.matrix(data.all["total_mapped_reads",])) , na.rm=TRUE)
++ total.unmapped.reads<-sum(as.numeric(as.matrix(data.all["unmapped_reads",])) , na.rm=TRUE)
++ total.dup.reads<-sum(as.numeric(as.matrix(data.all["total_dup_reads",])) , na.rm=TRUE) ## note this is not really true would need to run picard on the 2 files!
++ sum.total.reads<-sum(as.numeric(as.matrix(data.all["total_reads",])) , na.rm=TRUE)
+Loading required package: AnnotationDbi
++ 
++ 
++ ## change Aug 2013
++ 
++ total.unmapped.reads/(sum.total.reads)
+Loading required package: Biobase
++ total.dup.reads/(sum.total.reads-total.unmapped.reads)
++ total.dup.reads/(sum.total.reads) # this is what picard mark duplicated provides
++ 
++ 
++ ## total.unmapped.reads/(total.reads+total.unmapped.reads+total.dup.reads)
++ ## total.dup.reads/(total.reads)
++ ## total.dup.reads/(total.reads+total.unmapped.reads+total.dup.reads) # this is what picard mark duplicated provides
++ 
++   ######################################################
++   #####################################################
++   # Internal loop that processes the cov object
++  setwd(code.dir)
++ source("auto_loop_over_UQCCG_coverage_with_cov.r")
++  setwd(QC.directory)
++   ######################################################
++   #####################################################
++ 
++ ########################## WRITE OUTPUT
++  
++  colnames(data)<-sample.output
++  write.table(data,file=paste(QC.directory,sample.output,sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++  save(list=c("the.counts","cov","data"),file=paste(QC.directory,paste(sample.output,"regions.RData",sep="."),sep="/"))   
++   
++ 
++ if( is.null(on.target.stats) ) { on.target.stats<-data}else{
++  on.target.stats<-cbind(on.target.stats,data)}
++ 
++ k<-k+1
++   
++ #} # sample loop
++ 
++ 
++ 
++ rownames(on.target.stats)<-all.QC.column.labels # may not be set if combed run and non-run samples
++ write.table(on.target.stats,file=paste(QC.directory,paste(projects[ip],"quality.control.summary",sep="."),sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++ 
++ 
++ 
++ ######################Now compile summaries where there are samples with multiple bam files assume these are in the same project file
++ 
++ 
++ 
++ 
++ } # loop over projects
+[1] "RSGB_AML"
+ [1] "AMLM12PAH016K-B_H1178ADXX-1-01.ReCal.sort.bam"
+ [2] "AMLM12PAH016K-B_H1178ADXX-1-06.ReCal.sort.bam"
+ [3] "AMLM12PAH016K-B_H1178ADXX-1-07.ReCal.sort.bam"
+ [4] "AMLM12PAH016K-B_H1178ADXX-1-12.ReCal.sort.bam"
+ [5] "AMLM12PAH016K-B_H1178ADXX-2-01.ReCal.sort.bam"
+ [6] "AMLM12PAH016K-B_H1178ADXX-2-06.ReCal.sort.bam"
+ [7] "AMLM12PAH016K-B_H1178ADXX-2-07.ReCal.sort.bam"
+ [8] "AMLM12PAH016K-B_H1178ADXX-2-12.ReCal.sort.bam"
+ [9] "AMLM12PAH030PGB_H1178ADXX-1-02.ReCal.sort.bam"
+[10] "AMLM12PAH030PGB_H1178ADXX-1-08.ReCal.sort.bam"
+[11] "AMLM12PAH030PGB_H1178ADXX-2-02.ReCal.sort.bam"
+[12] "AMLM12PAH030PGB_H1178ADXX-2-08.ReCal.sort.bam"
+[13] "AMLM12PAH037A-B_H1178ADXX-1-03.ReCal.sort.bam"
+[14] "AMLM12PAH037A-B_H1178ADXX-1-09.ReCal.sort.bam"
+[15] "AMLM12PAH037A-B_H1178ADXX-2-03.ReCal.sort.bam"
+[16] "AMLM12PAH037A-B_H1178ADXX-2-09.ReCal.sort.bam"
+[17] "AMLM12PAH038BJD_H1178ADXX-1-04.ReCal.sort.bam"
+[18] "AMLM12PAH038BJD_H1178ADXX-1-10.ReCal.sort.bam"
+[19] "AMLM12PAH038BJD_H1178ADXX-2-04.ReCal.sort.bam"
+[20] "AMLM12PAH038BJD_H1178ADXX-2-10.ReCal.sort.bam"
+[21] "AMLM12RMH026J-N_H1178ADXX-1-05.ReCal.sort.bam"
+[22] "AMLM12RMH026J-N_H1178ADXX-1-11.ReCal.sort.bam"
+[23] "AMLM12RMH026J-N_H1178ADXX-2-05.ReCal.sort.bam"
+[24] "AMLM12RMH026J-N_H1178ADXX-2-11.ReCal.sort.bam"
+Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.
+
+[1] "AMLM12PAH016K-B DONE"
+> 
+> 
+> 
+> 
+> 
+> 
+
+R version 2.15.0 (2012-03-30)
+Copyright (C) 2012 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> 
+> library(GenomicFeatures)
+Loading required package: BiocGenerics
+
+Attaching package: ‘BiocGenerics’
+
+The following object(s) are masked from ‘package:stats’:
+
+    xtabs
+
+The following object(s) are masked from ‘package:base’:
+
+    anyDuplicated, cbind, colnames, duplicated, eval, Filter, Find,
+    get, intersect, lapply, Map, mapply, mget, order, paste, pmax,
+    pmax.int, pmin, pmin.int, Position, rbind, Reduce, rep.int,
+    rownames, sapply, setdiff, table, tapply, union, unique
+
+Loading required package: IRanges
+Loading required package: GenomicRanges
+> library(multicore)
+> library(Rsamtools)
+Loading required package: AnnotationDbi
+Loading required package: Biobase
+Loading required package: Biostrings
+> 
+> extractReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=FALSE,
++                                          isDuplicate=NA),
++                         what=c("rname", "pos", "cigar"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   ## Note that unmapped reads and reads that are PCR/optical duplicates
++   ## have already been filtered out by using the ScanBamParam object above.
++   irl <- cigarToIRangesListByRName(bam$cigar, bam$rname, bam$pos)
++   irl <- irl[elementLengths(irl) != 0]  # drop empty elements
++   irl
++ }
+> 
+> extractUnmappedReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=TRUE), what=c("qname"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   bam #bam$qname[1:5]
++ }
+> 
+> extract.value.from.info<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,\\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.format<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9\\ \\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.DS<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,:\\+\\ \\.\\-]*",sep="")  #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> ## the.readgroup["DS",]
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Lane:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="ParticipantCode:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:")
+> 
+> 
+> #non.project.directories<-c("Genomes","R-codes","annovar","Sequence_Reads","scripts","bcos_srv"
+>                          
+> 
+> get.readgroup.info<-function(sample.bam,readgroup.labels=c("ID","PL","LB","DS","SM")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   readgroup.cols<- {}
++ 
++   i.ar<-1
++   for(ib in 1:length(the.bam.files)){  ## perhaps different BAm files
++   ## the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@RG"]] # this only provides the FIRST RG
++   the.readgroup.list<-the.header[[the.bam.files[ib]]][["text"]][names(the.header[[the.bam.files[ib]]][["text"]])=="@RG"] ## perhaps many RG per BAm file
++ 
++   for(iread in 1:length(the.readgroup.list)){  # loop over RG
++   the.readgroup<-the.readgroup.list[[iread]]
++ 
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++ 
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])} #get rid of label from text
++   names(the.readgroup)<-the.RG.desc
++   
++   if(i.ar==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup[readgroup.labels,],the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++ 
++   ############### fix the capture technology labels ";" delinates label seperators 
++    if(is.na(a.readgroup["DS",i.ar])){a.readgroup["DS",i.ar]<-"NA"}  # so can just match with text later
++    a.readgroup["DS",i.ar]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX3","TruD:NimX3",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;Agl1.2","TruD:Agl1.2",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar]) # special fix  ;Description:Exome;
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtX","NxtD:NxtX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXR","NxtD:NxtXR",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXE","NxtD:NxtXE",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub(";Description:Exome;",";Description:TruD:NimX;",a.readgroup["DS",i.ar]) # special fix
++    ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   if(!grepl("^NA",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtX",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXR",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXE",a.readgroup["DS",i.ar])     & !grepl("TruD:Agl1.2",a.readgroup["DS",i.ar]) & !grepl("TruD:TruX",a.readgroup["DS",i.ar]) & !grepl("TruD:NimX",a.readgroup["DS",i.ar]) & !grepl("TruD;",a.readgroup["DS",i.ar]) ){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++   
++   i.ar<-i.ar+1
++     }}
++ colnames(a.readgroup)<-readgroup.cols
++   
++  a.readgroup
++ }
+> 
+> get.genome.info<-function(sample.bam,readgroup.labels=c("AS")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   for(ib in 1:length(the.bam.files)){
++   the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@SQ"]] ##only gets the first one
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])}
++   names(the.readgroup)<-the.RG.desc
++ 
++     if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup,the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++   }
++   
++   ## if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];colnames(a.readgroup)[1]<-the.bam.files[ib]}
++   ## else{a.readgroup[names(the.readgroup),ib]<-the.readgroup;colnames(a.readgroup)[ib]<-the.bam.files[ib]}
++   ##   }
++   
++   ##  a.readgroup["DS",ib]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",ib]) # special fix
++   ##  a.readgroup["DS",ib]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",ib]) # special fix
++   ##  ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   ## if(!is.na(a.readgroup["DS",ib]) & (!grepl("TruD:TruX",a.readgroup["DS",ib]) & !grepl("TruD:NimX",a.readgroup["DS",ib]) & !grepl("TruD;",a.readgroup["DS",ib]) )){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++  colnames(a.readgroup)<-readgroup.cols
++ for(ic in 1:dim(a.readgroup)[2]){a.readgroup[is.na(a.readgroup[,ic]),ic]<-"NA"} # replace NA by "NA"
++   a.readgroup
++ }
+> 
+> # sample.bam<-sample.bams[i]
+> get.targets.file<-function(sample.bam){
++ 
++ the.readgroup<-get.readgroup.info(sample.bam) # colnames is the bam file
++ the.genome<-get.genome.info(sample.bam)  # colnames is the bam file
++ the.capture<-extract.value.from.DS(the.readgroup["DS",],match.string="Description:")                                      # colnames is the bam file
++ names(the.capture)<-colnames(the.readgroup)
++ 
++ a.targets.file <- list()
++ 
++ for(i in 1:dim(the.readgroup)[2]){
++   targets.file<-NA
++   from.bam<-colnames(the.readgroup)[i]
++ 
++ ################ Define different capture technologyies used  
++ if(( the.genome["AS",from.bam]=="UCSC_ALL_FULL_CHROMS_HG19.nix") | (the.genome["AS",from.bam]=="NA") ){  # a hg19 genome
++     the.ref.genome<-"hg19";the.ref.genome.library<-"BSgenome.Hsapiens.UCSC.hg19"; the.ref.genome.object<-"Hsapiens" # used to get chromsome lengths
++     if(the.capture[from.bam]=="TruD:TruX"){targets.file<-"Human_Exome_Targets_illumina_v2_hg19_targets.RData"}
++     if(the.capture[from.bam]=="TruD:NimX"){targets.file<-"Human_Exome_Targets_Nimble_v2_hg19_targets.RData"} #(version=="v2")
++     if(the.capture[from.bam]=="TruD:NimX3"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2")TruD;Agl1.2
++     if(the.capture[from.bam]=="TruD:Agl1.2"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2"
++     if(the.capture[from.bam]=="NxtD:NxtX"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXE"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXR"){targets.file<-"NexteraRapidCapture_Exome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]==""){targets.file<-"Human_Exome_Targets_Nimble_v1_hg19_targets.RData"} #(version=="v1")
++ }
++   
++ if(the.genome["AS",from.bam]=="mm9.nix"){
++   the.ref.genome<-"mm9";the.ref.genome.library<-"BSgenome.Mmusculus.UCSC.mm9"; the.ref.genome.object<-"Mmusculus"
++  if(the.capture[from.bam]=="TruD:NimX"){ targets.file<-"Mouse_Exome_Targets_Nimble_v100803_targets.RData"}
++ }
++ ###############
++ 
++ a.target.info<-list(targets.file=targets.file,the.ref.genome=the.ref.genome,the.ref.genome.library=the.ref.genome.library,the.ref.genome.object=the.ref.genome.object)
++ 
++ if(i==1){a.targets.file<-list(a.target.info)}else{a.targets.file<-c(a.targets.file,list(a.target.info))}
++ }
++ 
++ 
++ 
++ names(a.targets.file)<-colnames(the.readgroup)
++ a.targets.file
++ }
+> 
+> 
+> 
+> basesAboveThreshold<-function(x,thresh=0){sum(x>=thresh)}
+> 
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> 
+> 
+> options(show.error.messages = TRUE)
+> possible.capture.methods<-c("TruD:TruX","TruD:NimX","TruD:NimX3","TruD:Agl1.2","NA","NxtD:NxtXE","NxtD:NxtXR")
+> UQCCG.data<-"/mnt/UQCCG/Sequencing/Projects"
+> the.genome<-"hg19" ## the.genome<-"mm9"
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> ############
+> restrict.analysis<-TRUE
+> restrict.to.projects<- c("RSGB_AML")        #AOGC FMHT-N,FTP 
+> restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> #############        
+> 
+> 
+> ## ############
+> ## restrict.analysis<-FALSE
+> ## restrict.to.projects<- ""        #AOGC FMHT-N,FTP 
+> ## restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> ## the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> ## #############
+> 
+> 
+> #############
+> 
+> 
+> genomes.path<-"/mnt/UQCCG/Sequencing/Data/Genomes/hg19" ## path to genomes files
+> force.redo.with.new.ranges<-FALSE # force.redo.with.new.ranges<-TRUE # set true is want to recalculate
+> extend.exons<-200 # all to exons start/end to get additional coverage
+> ##### need to choose one of the below:
+> 
+> 
+> ############################################################################
+> 
+> non.exome.projects<-c("AML-PacBio","BTCK","ALSPAC","AS-WGS","PLD","PLD-whole genome","AML-GENOME","bcos_srv","Mowry","QBI-DISC1")
+> 
+> 
+> 
+> ######################################## no need to change below ###################
+> all.QC.column.labels<-c("ID","Sample","Recipe","Capture.Method","Lane","Run","target_file","total_reads","total_mapped_reads","total_dup_reads","unmapped_reads","total.bases",paste("on.target.bases.",extend.exons,"bp",sep=""),"on.target.bases", "percent.on.target.bases","median.max.coverage", "median.mean.coverage","mean.mean.coverage","percent.ccds.gt.1","percent.ccds.gt.5","percent.ccds.gt.10","percent.ccds.gt.15","percent.ccds.gt.30","percent_Duplicated","percent_Unmapped","Description")
+> 
+> projects<-dir(UQCCG.data)
+> projects<-projects[!(projects %in% non.exome.projects)]
+> projects
+ [1] "2013-06_SKDP_Run"             "2013-12_SKDP_Run"            
+ [3] "ALSPAC_MOVED_di-rdr"          "AML-exome"                   
+ [5] "AML-GENOME_MOVED_di-rdr"      "AML-PacBio_MOVED_TO_TRI"     
+ [7] "AOGC-NGS"                     "Chinese Controls from tulane"
+ [9] "Ch_MND_F"                     "Ch_MND_S"                    
+[11] "DISH"                         "FMHT"                        
+[13] "FMHT-N"                       "IYMD-Lung"                   
+[15] "MODY"                         "new_SKDP-SD"                 
+[17] "NSOG"                         "P01.zip"                     
+[19] "PCC"                          "QIMR-GCJL"                   
+[21] "QIMR-GCJL_MOVED_di-rdr"       "RNSH"                        
+[23] "RSGB_AML"                     "SKDP"                        
+[25] "SKDP-ARGP"                    "SKDP-FAM-10"                 
+[27] "SKDP-FAM-11"                  "SKDP-FAM-12"                 
+[29] "SKDP-FAM-121"                 "SKDP-FAM-13"                 
+[31] "SKDP-FAM-16"                  "SKDP-FAM-168"                
+[33] "SKDP-FAM-171"                 "SKDP-FAM-178"                
+[35] "SKDP-FAM-183"                 "SKDP-FAM-2"                  
+[37] "SKDP-FAM-209"                 "SKDP-FAM-24"                 
+[39] "SKDP-FAM-26"                  "SKDP-FAM-31"                 
+[41] "SKDP-FAM-36"                  "SKDP-FAM-38-Melorheostosis"  
+[43] "SKDP-FAM-4"                   "SKDP-FAM-40"                 
+[45] "SKDP-FAM-41"                  "SKDP-FAM-42"                 
+[47] "SKDP-FAM-44"                  "SKDP-FAM-49"                 
+[49] "SKDP-FAM-51"                  "SKDP-FAM-57"                 
+[51] "SKDP-FAM-6"                   "SKDP-FAM-61"                 
+[53] "SKDP-FAM-66"                  "SKDP-FAM-7"                  
+[55] "SKDP-FAM-70-RUSP"             "SKDP-FAM-71"                 
+[57] "SKDP-FAM-76"                  "SKDP-FAM-77"                 
+[59] "SKDP-FAM-78"                  "SKDP-FAM-80-FOP"             
+[61] "SKDP-FAM-84-Marfan"           "SKDP-FAM-9"                  
+[63] "SKDP-FAM-90"                  "SKDP-FAM-92"                 
+[65] "SKDP-FAM-99"                  "SKDP-FMDP"                   
+[67] "SKDP-MCTO"                    "SKDP-OI"                     
+[69] "SKDP-OI-TypeV"                "SKDP-SD"                     
+[71] "SKDP-SD-OLD"                  "SKDP-SRP"                    
+[73] "TBX21annotation"              "TGCM-AML"                    
+[75] "tulane-FRENCE-control-data"  
+> ##
+> 
+> all.data<-{}
+> count<-0
+> 
+> 
+> if(restrict.analysis){
++   projects<-projects[projects %in% restrict.to.projects]
++ }
+> 
+> print(projects)
+[1] "RSGB_AML"
+> targets.file.ori<-""
+> ####### ip<-1
+> for(ip in 1:length(projects)){
++ print(projects[ip])
++ on.target.stats<-{}  # this will be rebuilt from the individual 
++ 
++ BAM.directory<-paste(UQCCG.data,projects[ip],"BAM",sep="/")
++ x<-try(setwd(BAM.directory ))
++ if(inherits(x, "try-error")){next}
++ 
++ QC.root.directory<-paste(UQCCG.data,projects[ip],"QC",sep="/")
++ xx<-try(setwd( QC.root.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.root.directory,sep=" "));setwd( QC.root.directory  )}
++ 
++ 
++ QC.directory<-paste(UQCCG.data,projects[ip],"QC/AlignedQC",sep="/")
++ xx<-try(setwd( QC.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.directory,sep=" "));setwd( QC.directory);QC.files<-dir(getwd())}else{QC.files<-dir(getwd())}
++   ## QC.files<-QC.files[grepl(".QC$",QC.files)]
++ 
++ 
++ setwd(BAM.directory)
++ files<-dir(getwd())
++ sample.bams<-files[grepl(".bam$",files)] # sample.bams<-sample.bams.ori[48:132] # sample.bams<-sample.bams.ori[1:47] # sample.bams.ori<-sample.bams
++ 
++ if((restrict.to.run=="INCLUDE") | (restrict.to.run=="EXCLUDE")){
++   if(restrict.to.run=="INCLUDE"){
++     wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[wanted]
++   }
++   if(restrict.to.run=="EXCLUDE"){
++         wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[!wanted]
++   }}
++ 
++ print(sample.bams)
++ 
++ 
++ k<-1
++ all.readgroup<-get.readgroup.info(sample.bams)
++ all.genome<-get.genome.info(sample.bams)
++ all.target.files<-get.targets.file(sample.bams)
++   
++ 
++ duplicated.samples<-all.readgroup["SM",][duplicated(all.readgroup["SM",])]
++ 
++  #  merged BAM files with same SM can make 3 apparent files **coverage done at BAM file level not SM level**
++ if(length(names(duplicated.samples)) > length(unique(names(duplicated.samples)) )){
++ duplicated.samples<-duplicated.samples[!duplicated(names(duplicated.samples))] # only unique BAm files
++ duplicated.samples<-duplicated.samples[duplicated(duplicated.samples)] # duplicated samples
++ }
++ 
++ ### added by Mhairi - Jan 2013
++ duplicated.samples <- unique(duplicated.samples)
++ 
++   if(length(duplicated.samples)==0){next}
++ ## 
++ i <- 2
++ #for(i in 1:length(duplicated.samples)){
++   
++ sample.output<-paste(duplicated.samples[i],".combined.ReCal.sort.QC",sep="")   # names of file data is saved to
++ 
++ the.readgroup<-all.readgroup[,all.readgroup["SM",]==duplicated.samples[i] ]
++ the.bam.files<-colnames(the.readgroup)
++ bam.roots<-dirname((the.bam.files))
++ sample.bam.counts<-paste(gsub(".bam$","",basename((the.bam.files))),"QC",sep=".")
++ cov.objects<-paste(sample.bam.counts,"regions.RData",sep=".")
++ names(cov.objects)<-the.bam.files
++ 
++ ######### check the cov.objects exist ##
++ cov.objects<-cov.objects[cov.objects %in% QC.files]
++ 
++ 
++   ###################### already run so skip out
++ if(!force.redo.with.new.ranges){
++   
++ if( (sample.output %in% QC.files) ){ ## probably has been done
++   QC.file.chk<-read.delim(paste(QC.directory,sample.output,sep="/"),header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
++   present<-rownames(QC.file.chk) %in% all.QC.column.labels 
++   QC.file.chk<-subset(QC.file.chk,subset=present)  ### Get rid of extra informtion that might  have been collected
++   
++   if( ("ID" %in% rownames(QC.file.chk)) & ("Capture.Method"  %in% rownames(QC.file.chk)) &  sum(all.QC.column.labels %in% rownames(QC.file.chk))==length(all.QC.column.labels)   ){ # this file has been processed and is ok
++        if( is.null(on.target.stats) ){ on.target.stats<-as.matrix(QC.file.chk[all.QC.column.labels,])}else{on.target.stats<-cbind(on.target.stats,QC.file.chk[all.QC.column.labels,])} # complile on.target.stats
++        print(paste(duplicated.samples[i],"DONE",sep=" "))
++        next# now force skip of analysis below
++                    } 
++ }else{print(paste(duplicated.samples[i],"NOT combined running",sep=" "))}
++ 
++ } # end force redo
++ ##########################
++ 
++ 
++ 
++  ############### load ths coverage objects and check they are up to date
++ 
++  ############### NOte they could be on different genomes with different chromsomes definitions so addition of cov objects could fail the chr hanes are from the targets file
++  ############## so a cov object with all chromsomes is made
++ ############# NOte cov object of different lensthsor with different names can't be simply added together
++ 
++  
++ setwd(QC.directory)
++ old.cov.object<-rep(FALSE,times=length(cov.objects))
++  cov.all<-{}
++  data.all<-{}
++ for(ic in 1:length(cov.objects)){
++   print(cov.objects[ic])
++   load(cov.objects[ic])
++   if( !( ("ID" %in% rownames(data)) & ("Capture.Method"  %in% rownames(data)) &  sum(all.QC.column.labels %in% rownames(data))==length(all.QC.column.labels)    ) ){old.cov.object[ic]<-TRUE;next} #the data object denotes it is old
++   if(is.null(cov.all)){cov.all<-cov;chrs.known<-names(cov.all)}else{
++     new.chrs<-names(cov)
++     common.chrs<-new.chrs[new.chrs %in% chrs.known]
++     new.chrs<-new.chrs[!(new.chrs %in% chrs.known)]
++     if(length(common.chrs)>0){
++       for(icc in 1:length(common.chrs)){ cov.all[common.chrs[icc]]<- cov.all[common.chrs[icc]] +  cov[common.chrs[icc]] } # all together chromosomes
++        }
++     if(length(new.chrs)>0){cov.all<-c(cov.all,cov[new.chrs]);print(paste("WARNING new chromosomes:",toString(new.chrs),"WITHIN:", toString(cov.objects),sep=" ")) }
++        } # new cove object 
++   if(is.null(data.all)){data.all<-data}else{data.all<-cbind(data.all,data)}
++ }
++ cov<-cov.all
++ data.all
++ sum(old.cov.object)
++ 
++ cov.objects<-cov.objects[!old.cov.object]
++ rm(cov.all)
++ rm(the.counts)
++  
++ 
++ if(length(cov.objects)<2){next} # there are not enough RDATA files to proceed
++ 
++ 
++ the.readgroup<-the.readgroup[,names(cov.objects)]
++ the.genome<-all.genome[,names(cov.objects)]
++ the.target.files<-all.target.files[names(cov.objects)]
++                              
++ the.sample<-duplicated.samples[i]
++ 
++ the.current.bam<-paste(the.bam.files,collapse=";")
++   
++ a.run<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="FCID:"),collapse=";") # runID
++ ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:"),collapse=";") # genome ref
++ a.lane<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="Lane:"),collapse=";") # LAne
++ a.capture<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Description:"),collapse=";") # capture.tech
++ a.recipe<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:"),collapse=";") # recipe
++ a.sample<-the.sample
++ a.sample.ID<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:"),collapse=";")  # ID
++ a.DS<-paste(the.readgroup["DS",],collapse=";")
++ 
++ 
++  num.genomes.same<-length(unique(the.genome))
++ if(num.genomes.same>1){print(paste("ERROR for",toString(the.bam.files),"genomes differ can't combine",sep=" "));next}
++ 
++  ####################### find the lost inclusive target file and determine it's position in 
++ possible.targets<- extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
++ num.possible.targets<-length(unique(the.genome))
++ if(num.possible.targets==1){ii<-1}else{
++ # possible.capture.methods<-c("TruD:TruX","TruD:NimX","NA") # defined above
++   posns<-match( possible.targets,capture.methods)
++   ii<-which.min(posns)
++ }  #ii not contains the best targets option 
++ 
++   
++   ########################################
++ 
++ targets.file<-the.target.files[[ii]]$targets.file
++   if(is.na(targets.file)){print("ERROR targets file not obtained");next}
++ 
++ if(targets.file != targets.file.ori){
++   load(paste(genomes.path,targets.file,sep="/"))
++   package<-the.target.files[[ii]]$the.ref.genome.library
++   library(package,character.only=TRUE)
++   the.chroms<-seqlengths(eval(as.name(the.target.files[[ii]]$the.ref.genome.object)))
++ 
++   genome(data.gr)<-the.target.files[[ii]]$the.ref.genome
++   gr<-data.gr
++ 
++   rl.from.gr<-as(data.gr, "RangesList") # data.gr contains
++   rl.from.gr.expanded<-rl.from.gr+extend.exons
++   rl.from.gr.expanded<-reduce(rl.from.gr.expanded)
++   targets.file.ori<-targets.file
++ }
++ 
++ human.chromlens<-the.chroms[names(cov)]
++ if(length(human.chromlens)<15){
++   print("WARNING fewer than expected chomosomes")
++   if(length(human.chromlens)<1){ print("ERROR NO chomosomes");next}
++    }
++ 
++ ##   paramAll <- ScanBamParam(scanBamFlag(isUnmappedQuery=NA, isDuplicate=NA, isPaired=NA),what=c("rname"))
++ ## all.reads<-countBam(the.bam.files[ii],param=paramAll) # same as  (total.reads+total.unmapped.reads+total.dup.reads)
++ ##############the reads contain all the sequence reads 
++ total.reads<-sum(as.numeric(as.matrix(data.all["total_mapped_reads",])) , na.rm=TRUE)
++ total.unmapped.reads<-sum(as.numeric(as.matrix(data.all["unmapped_reads",])) , na.rm=TRUE)
++ total.dup.reads<-sum(as.numeric(as.matrix(data.all["total_dup_reads",])) , na.rm=TRUE) ## note this is not really true would need to run picard on the 2 files!
++ sum.total.reads<-sum(as.numeric(as.matrix(data.all["total_reads",])) , na.rm=TRUE)
++ 
++ 
++ ## change Aug 2013
++ 
++ total.unmapped.reads/(sum.total.reads)
++ total.dup.reads/(sum.total.reads-total.unmapped.reads)
++ total.dup.reads/(sum.total.reads) # this is what picard mark duplicated provides
++ 
++ 
++ ## total.unmapped.reads/(total.reads+total.unmapped.reads+total.dup.reads)
++ ## total.dup.reads/(total.reads)
++ ## total.dup.reads/(total.reads+total.unmapped.reads+total.dup.reads) # this is what picard mark duplicated provides
++ 
++   ######################################################
++   #####################################################
++   # Internal loop that processes the cov object
++  setwd(code.dir)
++ source("auto_loop_over_UQCCG_coverage_with_cov.r")
++  setwd(QC.directory)
++   ######################################################
++   #####################################################
++ 
++ ########################## WRITE OUTPUT
++  
++  colnames(data)<-sample.output
++  write.table(data,file=paste(QC.directory,sample.output,sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++  save(list=c("the.counts","cov","data"),file=paste(QC.directory,paste(sample.output,"regions.RData",sep="."),sep="/"))   
++   
++ 
++ if( is.null(on.target.stats) ) { on.target.stats<-data}else{
++  on.target.stats<-cbind(on.target.stats,data)}
++ 
++ k<-k+1
++   
++ #} # sample loop
++ 
++ 
++ 
++ rownames(on.target.stats)<-all.QC.column.labels # may not be set if combed run and non-run samples
++ write.table(on.target.stats,file=paste(QC.directory,paste(projects[ip],"quality.control.summary",sep="."),sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++ 
++ 
++ 
++ ######################Now compile summaries where there are samples with multiple bam files assume these are in the same project file
++ 
++ 
++ 
++ 
++ } # loop over projects
+[1] "RSGB_AML"
+ [1] "AMLM12PAH016K-B_H1178ADXX-1-01.ReCal.sort.bam"
+ [2] "AMLM12PAH016K-B_H1178ADXX-1-06.ReCal.sort.bam"
+ [3] "AMLM12PAH016K-B_H1178ADXX-1-07.ReCal.sort.bam"
+ [4] "AMLM12PAH016K-B_H1178ADXX-1-12.ReCal.sort.bam"
+ [5] "AMLM12PAH016K-B_H1178ADXX-2-01.ReCal.sort.bam"
+ [6] "AMLM12PAH016K-B_H1178ADXX-2-06.ReCal.sort.bam"
+ [7] "AMLM12PAH016K-B_H1178ADXX-2-07.ReCal.sort.bam"
+ [8] "AMLM12PAH016K-B_H1178ADXX-2-12.ReCal.sort.bam"
+ [9] "AMLM12PAH030PGB_H1178ADXX-1-02.ReCal.sort.bam"
+[10] "AMLM12PAH030PGB_H1178ADXX-1-08.ReCal.sort.bam"
+[11] "AMLM12PAH030PGB_H1178ADXX-2-02.ReCal.sort.bam"
+[12] "AMLM12PAH030PGB_H1178ADXX-2-08.ReCal.sort.bam"
+[13] "AMLM12PAH037A-B_H1178ADXX-1-03.ReCal.sort.bam"
+[14] "AMLM12PAH037A-B_H1178ADXX-1-09.ReCal.sort.bam"
+[15] "AMLM12PAH037A-B_H1178ADXX-2-03.ReCal.sort.bam"
+[16] "AMLM12PAH037A-B_H1178ADXX-2-09.ReCal.sort.bam"
+[17] "AMLM12PAH038BJD_H1178ADXX-1-04.ReCal.sort.bam"
+[18] "AMLM12PAH038BJD_H1178ADXX-1-10.ReCal.sort.bam"
+[19] "AMLM12PAH038BJD_H1178ADXX-2-04.ReCal.sort.bam"
+[20] "AMLM12PAH038BJD_H1178ADXX-2-10.ReCal.sort.bam"
+[21] "AMLM12RMH026J-N_H1178ADXX-1-05.ReCal.sort.bam"
+[22] "AMLM12RMH026J-N_H1178ADXX-1-11.ReCal.sort.bam"
+[23] "AMLM12RMH026J-N_H1178ADXX-2-05.ReCal.sort.bam"
+[24] "AMLM12RMH026J-N_H1178ADXX-2-11.ReCal.sort.bam"
+Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.
+
+[1] "AMLM12PAH030PGB NOT combined running"
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH030PGB_H1178ADXX-1-02.ReCal.sort.bam 
+                             "AMLM12PAH030PGB_H1178ADXX-1-02.ReCal.sort.QC.regions.RData" 
+
+R version 2.15.0 (2012-03-30)
+Copyright (C) 2012 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> 
+> library(GenomicFeatures)
+Loading required package: BiocGenerics
+
+Attaching package: ‘BiocGenerics’
+
+The following object(s) are masked from ‘package:stats’:
+
+    xtabs
+
+The following object(s) are masked from ‘package:base’:
+
+    anyDuplicated, cbind, colnames, duplicated, eval, Filter, Find,
+    get, intersect, lapply, Map, mapply, mget, order, paste, pmax,
+    pmax.int, pmin, pmin.int, Position, rbind, Reduce, rep.int,
+    rownames, sapply, setdiff, table, tapply, union, unique
+
+Loading required package: IRanges
+Loading required package: GenomicRanges
+Loading required package: AnnotationDbi
+Loading required package: Biobase
+> library(multicore)
+> library(Rsamtools)
+Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.
+
+Loading required package: Biostrings
+> 
+> extractReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=FALSE,
++                                          isDuplicate=NA),
++                         what=c("rname", "pos", "cigar"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   ## Note that unmapped reads and reads that are PCR/optical duplicates
++   ## have already been filtered out by using the ScanBamParam object above.
++   irl <- cigarToIRangesListByRName(bam$cigar, bam$rname, bam$pos)
++   irl <- irl[elementLengths(irl) != 0]  # drop empty elements
++   irl
++ }
+> 
+> extractUnmappedReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=TRUE), what=c("qname"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   bam #bam$qname[1:5]
++ }
+> 
+> extract.value.from.info<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,\\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.format<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9\\ \\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.DS<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,:\\+\\ \\.\\-]*",sep="")  #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> ## the.readgroup["DS",]
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Lane:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="ParticipantCode:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:")
+> 
+> 
+> #non.project.directories<-c("Genomes","R-codes","annovar","Sequence_Reads","scripts","bcos_srv"
+>                          
+> 
+> get.readgroup.info<-function(sample.bam,readgroup.labels=c("ID","PL","LB","DS","SM")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   readgroup.cols<- {}
++ 
++   i.ar<-1
++   for(ib in 1:length(the.bam.files)){  ## perhaps different BAm files
++   ## the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@RG"]] # this only provides the FIRST RG
++   the.readgroup.list<-the.header[[the.bam.files[ib]]][["text"]][names(the.header[[the.bam.files[ib]]][["text"]])=="@RG"] ## perhaps many RG per BAm file
++ 
++   for(iread in 1:length(the.readgroup.list)){  # loop over RG
++   the.readgroup<-the.readgroup.list[[iread]]
++ 
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++ 
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])} #get rid of label from text
++   names(the.readgroup)<-the.RG.desc
++   
++   if(i.ar==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup[readgroup.labels,],the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++ 
++   ############### fix the capture technology labels ";" delinates label seperators 
++    if(is.na(a.readgroup["DS",i.ar])){a.readgroup["DS",i.ar]<-"NA"}  # so can just match with text later
++    a.readgroup["DS",i.ar]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX3","TruD:NimX3",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;Agl1.2","TruD:Agl1.2",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar]) # special fix  ;Description:Exome;
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtX","NxtD:NxtX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXR","NxtD:NxtXR",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXE","NxtD:NxtXE",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub(";Description:Exome;",";Description:TruD:NimX;",a.readgroup["DS",i.ar]) # special fix
++    ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   if(!grepl("^NA",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtX",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXR",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXE",a.readgroup["DS",i.ar])     & !grepl("TruD:Agl1.2",a.readgroup["DS",i.ar]) & !grepl("TruD:TruX",a.readgroup["DS",i.ar]) & !grepl("TruD:NimX",a.readgroup["DS",i.ar]) & !grepl("TruD;",a.readgroup["DS",i.ar]) ){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++   
++   i.ar<-i.ar+1
++     }}
++ colnames(a.readgroup)<-readgroup.cols
++   
++  a.readgroup
++ }
+> 
+> get.genome.info<-function(sample.bam,readgroup.labels=c("AS")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   for(ib in 1:length(the.bam.files)){
++   the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@SQ"]] ##only gets the first one
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])}
++   names(the.readgroup)<-the.RG.desc
++ 
++     if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup,the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++   }
++   
++   ## if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];colnames(a.readgroup)[1]<-the.bam.files[ib]}
++   ## else{a.readgroup[names(the.readgroup),ib]<-the.readgroup;colnames(a.readgroup)[ib]<-the.bam.files[ib]}
++   ##   }
++   
++   ##  a.readgroup["DS",ib]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",ib]) # special fix
++   ##  a.readgroup["DS",ib]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",ib]) # special fix
++   ##  ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   ## if(!is.na(a.readgroup["DS",ib]) & (!grepl("TruD:TruX",a.readgroup["DS",ib]) & !grepl("TruD:NimX",a.readgroup["DS",ib]) & !grepl("TruD;",a.readgroup["DS",ib]) )){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++  colnames(a.readgroup)<-readgroup.cols
++ for(ic in 1:dim(a.readgroup)[2]){a.readgroup[is.na(a.readgroup[,ic]),ic]<-"NA"} # replace NA by "NA"
++   a.readgroup
++ }
+> 
+> # sample.bam<-sample.bams[i]
+> get.targets.file<-function(sample.bam){
++ 
++ the.readgroup<-get.readgroup.info(sample.bam) # colnames is the bam file
++ the.genome<-get.genome.info(sample.bam)  # colnames is the bam file
++ the.capture<-extract.value.from.DS(the.readgroup["DS",],match.string="Description:")                                      # colnames is the bam file
++ names(the.capture)<-colnames(the.readgroup)
++ 
++ a.targets.file <- list()
++ 
++ for(i in 1:dim(the.readgroup)[2]){
++   targets.file<-NA
++   from.bam<-colnames(the.readgroup)[i]
++ 
++ ################ Define different capture technologyies used  
++ if(( the.genome["AS",from.bam]=="UCSC_ALL_FULL_CHROMS_HG19.nix") | (the.genome["AS",from.bam]=="NA") ){  # a hg19 genome
++     the.ref.genome<-"hg19";the.ref.genome.library<-"BSgenome.Hsapiens.UCSC.hg19"; the.ref.genome.object<-"Hsapiens" # used to get chromsome lengths
++     if(the.capture[from.bam]=="TruD:TruX"){targets.file<-"Human_Exome_Targets_illumina_v2_hg19_targets.RData"}
++     if(the.capture[from.bam]=="TruD:NimX"){targets.file<-"Human_Exome_Targets_Nimble_v2_hg19_targets.RData"} #(version=="v2")
++     if(the.capture[from.bam]=="TruD:NimX3"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2")TruD;Agl1.2
++     if(the.capture[from.bam]=="TruD:Agl1.2"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2"
++     if(the.capture[from.bam]=="NxtD:NxtX"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXE"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXR"){targets.file<-"NexteraRapidCapture_Exome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]==""){targets.file<-"Human_Exome_Targets_Nimble_v1_hg19_targets.RData"} #(version=="v1")
++ }
++   
++ if(the.genome["AS",from.bam]=="mm9.nix"){
++   the.ref.genome<-"mm9";the.ref.genome.library<-"BSgenome.Mmusculus.UCSC.mm9"; the.ref.genome.object<-"Mmusculus"
++  if(the.capture[from.bam]=="TruD:NimX"){ targets.file<-"Mouse_Exome_Targets_Nimble_v100803_targets.RData"}
++ }
++ ###############
++ 
++ a.target.info<-list(targets.file=targets.file,the.ref.genome=the.ref.genome,the.ref.genome.library=the.ref.genome.library,the.ref.genome.object=the.ref.genome.object)
++ 
++ if(i==1){a.targets.file<-list(a.target.info)}else{a.targets.file<-c(a.targets.file,list(a.target.info))}
++ }
++ 
++ 
++ 
++ names(a.targets.file)<-colnames(the.readgroup)
++ a.targets.file
++ }
+> 
+> 
+> 
+> basesAboveThreshold<-function(x,thresh=0){sum(x>=thresh)}
+> 
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> 
+> 
+> options(show.error.messages = TRUE)
+> possible.capture.methods<-c("TruD:TruX","TruD:NimX","TruD:NimX3","TruD:Agl1.2","NA","NxtD:NxtXE","NxtD:NxtXR")
+> UQCCG.data<-"/mnt/UQCCG/Sequencing/Projects"
+> the.genome<-"hg19" ## the.genome<-"mm9"
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> ############
+> restrict.analysis<-TRUE
+> restrict.to.projects<- c("RSGB_AML")        #AOGC FMHT-N,FTP 
+> restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> #############        
+> 
+> 
+> ## ############
+> ## restrict.analysis<-FALSE
+> ## restrict.to.projects<- ""        #AOGC FMHT-N,FTP 
+> ## restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> ## the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> ## #############
+> 
+> 
+> #############
+> 
+> 
+> genomes.path<-"/mnt/UQCCG/Sequencing/Data/Genomes/hg19" ## path to genomes files
+> force.redo.with.new.ranges<-FALSE # force.redo.with.new.ranges<-TRUE # set true is want to recalculate
+> extend.exons<-200 # all to exons start/end to get additional coverage
+> ##### need to choose one of the below:
+> 
+> 
+> ############################################################################
+> 
+> non.exome.projects<-c("AML-PacBio","BTCK","ALSPAC","AS-WGS","PLD","PLD-whole genome","AML-GENOME","bcos_srv","Mowry","QBI-DISC1")
+> 
+> 
+> 
+> ######################################## no need to change below ###################
+> all.QC.column.labels<-c("ID","Sample","Recipe","Capture.Method","Lane","Run","target_file","total_reads","total_mapped_reads","total_dup_reads","unmapped_reads","total.bases",paste("on.target.bases.",extend.exons,"bp",sep=""),"on.target.bases", "percent.on.target.bases","median.max.coverage", "median.mean.coverage","mean.mean.coverage","percent.ccds.gt.1","percent.ccds.gt.5","percent.ccds.gt.10","percent.ccds.gt.15","percent.ccds.gt.30","percent_Duplicated","percent_Unmapped","Description")
+> 
+> projects<-dir(UQCCG.data)
+> projects<-projects[!(projects %in% non.exome.projects)]
+> projects
+ [1] "2013-06_SKDP_Run"             "2013-12_SKDP_Run"            
+ [3] "ALSPAC_MOVED_di-rdr"          "AML-exome"                   
+ [5] "AML-GENOME_MOVED_di-rdr"      "AML-PacBio_MOVED_TO_TRI"     
+ [7] "AOGC-NGS"                     "Chinese Controls from tulane"
+ [9] "Ch_MND_F"                     "Ch_MND_S"                    
+[11] "DISH"                         "FMHT"                        
+[13] "FMHT-N"                       "IYMD-Lung"                   
+[15] "MODY"                         "new_SKDP-SD"                 
+[17] "NSOG"                         "P01.zip"                     
+[19] "PCC"                          "QIMR-GCJL"                   
+[21] "QIMR-GCJL_MOVED_di-rdr"       "RNSH"                        
+[23] "RSGB_AML"                     "SKDP"                        
+[25] "SKDP-ARGP"                    "SKDP-FAM-10"                 
+[27] "SKDP-FAM-11"                  "SKDP-FAM-12"                 
+[29] "SKDP-FAM-121"                 "SKDP-FAM-13"                 
+[31] "SKDP-FAM-16"                  "SKDP-FAM-168"                
+[33] "SKDP-FAM-171"                 "SKDP-FAM-178"                
+[35] "SKDP-FAM-183"                 "SKDP-FAM-2"                  
+[37] "SKDP-FAM-209"                 "SKDP-FAM-24"                 
+[39] "SKDP-FAM-26"                  "SKDP-FAM-31"                 
+[41] "SKDP-FAM-36"                  "SKDP-FAM-38-Melorheostosis"  
+[43] "SKDP-FAM-4"                   "SKDP-FAM-40"                 
+[45] "SKDP-FAM-41"                  "SKDP-FAM-42"                 
+[47] "SKDP-FAM-44"                  "SKDP-FAM-49"                 
+[49] "SKDP-FAM-51"                  "SKDP-FAM-57"                 
+[51] "SKDP-FAM-6"                   "SKDP-FAM-61"                 
+[53] "SKDP-FAM-66"                  "SKDP-FAM-7"                  
+[55] "SKDP-FAM-70-RUSP"             "SKDP-FAM-71"                 
+[57] "SKDP-FAM-76"                  "SKDP-FAM-77"                 
+[59] "SKDP-FAM-78"                  "SKDP-FAM-80-FOP"             
+[61] "SKDP-FAM-84-Marfan"           "SKDP-FAM-9"                  
+[63] "SKDP-FAM-90"                  "SKDP-FAM-92"                 
+[65] "SKDP-FAM-99"                  "SKDP-FMDP"                   
+[67] "SKDP-MCTO"                    "SKDP-OI"                     
+[69] "SKDP-OI-TypeV"                "SKDP-SD"                     
+[71] "SKDP-SD-OLD"                  "SKDP-SRP"                    
+[73] "TBX21annotation"              "TGCM-AML"                    
+[75] "tulane-FRENCE-control-data"  
+> ##
+> 
+> all.data<-{}
+> count<-0
+> 
+> 
+> if(restrict.analysis){
++   projects<-projects[projects %in% restrict.to.projects]
++ }
+> 
+> print(projects)
+[1] "RSGB_AML"
+> targets.file.ori<-""
+> ####### ip<-1
+> for(ip in 1:length(projects)){
++ print(projects[ip])
++ on.target.stats<-{}  # this will be rebuilt from the individual 
++ 
++ BAM.directory<-paste(UQCCG.data,projects[ip],"BAM",sep="/")
++ x<-try(setwd(BAM.directory ))
++ if(inherits(x, "try-error")){next}
++ 
++ QC.root.directory<-paste(UQCCG.data,projects[ip],"QC",sep="/")
++ xx<-try(setwd( QC.root.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.root.directory,sep=" "));setwd( QC.root.directory  )}
++ 
++ 
++ QC.directory<-paste(UQCCG.data,projects[ip],"QC/AlignedQC",sep="/")
++ xx<-try(setwd( QC.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.directory,sep=" "));setwd( QC.directory);QC.files<-dir(getwd())}else{QC.files<-dir(getwd())}
++   ## QC.files<-QC.files[grepl(".QC$",QC.files)]
++ 
++ 
++ setwd(BAM.directory)
++ files<-dir(getwd())
++ sample.bams<-files[grepl(".bam$",files)] # sample.bams<-sample.bams.ori[48:132] # sample.bams<-sample.bams.ori[1:47] # sample.bams.ori<-sample.bams
++ 
++ if((restrict.to.run=="INCLUDE") | (restrict.to.run=="EXCLUDE")){
++   if(restrict.to.run=="INCLUDE"){
++     wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[wanted]
++   }
++   if(restrict.to.run=="EXCLUDE"){
++         wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[!wanted]
++   }}
++ 
++ print(sample.bams)
++ 
++ 
++ k<-1
++ all.readgroup<-get.readgroup.info(sample.bams)
++ all.genome<-get.genome.info(sample.bams)
++ all.target.files<-get.targets.file(sample.bams)
++   
++ 
++ duplicated.samples<-all.readgroup["SM",][duplicated(all.readgroup["SM",])]
++ 
++  #  merged BAM files with same SM can make 3 apparent files **coverage done at BAM file level not SM level**
++ if(length(names(duplicated.samples)) > length(unique(names(duplicated.samples)) )){
++ duplicated.samples<-duplicated.samples[!duplicated(names(duplicated.samples))] # only unique BAm files
++ duplicated.samples<-duplicated.samples[duplicated(duplicated.samples)] # duplicated samples
++ }
++ 
++ ### added by Mhairi - Jan 2013
++ duplicated.samples <- unique(duplicated.samples)
++ 
++   if(length(duplicated.samples)==0){next}
++ ## 
++ i <- 3
++ #for(i in 1:length(duplicated.samples)){
++   
++ sample.output<-paste(duplicated.samples[i],".combined.ReCal.sort.QC",sep="")   # names of file data is saved to
++ 
++ the.readgroup<-all.readgroup[,all.readgroup["SM",]==duplicated.samples[i] ]
++ the.bam.files<-colnames(the.readgroup)
++ bam.roots<-dirname((the.bam.files))
++ sample.bam.counts<-paste(gsub(".bam$","",basename((the.bam.files))),"QC",sep=".")
++ cov.objects<-paste(sample.bam.counts,"regions.RData",sep=".")
++ names(cov.objects)<-the.bam.files
++ 
++ ######### check the cov.objects exist ##
++ cov.objects<-cov.objects[cov.objects %in% QC.files]
++ 
++ 
++   ###################### already run so skip out
++ if(!force.redo.with.new.ranges){
++   
++ if( (sample.output %in% QC.files) ){ ## probably has been done
++   QC.file.chk<-read.delim(paste(QC.directory,sample.output,sep="/"),header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
++   present<-rownames(QC.file.chk) %in% all.QC.column.labels 
++   QC.file.chk<-subset(QC.file.chk,subset=present)  ### Get rid of extra informtion that might  have been collected
++   
++   if( ("ID" %in% rownames(QC.file.chk)) & ("Capture.Method"  %in% rownames(QC.file.chk)) &  sum(all.QC.column.labels %in% rownames(QC.file.chk))==length(all.QC.column.labels)   ){ # this file has been processed and is ok
++        if( is.null(on.target.stats) ){ on.target.stats<-as.matrix(QC.file.chk[all.QC.column.labels,])}else{on.target.stats<-cbind(on.target.stats,QC.file.chk[all.QC.column.labels,])} # complile on.target.stats
++        print(paste(duplicated.samples[i],"DONE",sep=" "))
++        next# now force skip of analysis below
++                    } 
++ }else{print(paste(duplicated.samples[i],"NOT combined running",sep=" "))}
++ 
++ } # end force redo
++ ##########################
++ 
++ 
++ 
++  ############### load ths coverage objects and check they are up to date
++ 
++  ############### NOte they could be on different genomes with different chromsomes definitions so addition of cov objects could fail the chr hanes are from the targets file
++  ############## so a cov object with all chromsomes is made
++ ############# NOte cov object of different lensthsor with different names can't be simply added together
++ 
++  
++ setwd(QC.directory)
++ old.cov.object<-rep(FALSE,times=length(cov.objects))
++  cov.all<-{}
++  data.all<-{}
++ for(ic in 1:length(cov.objects)){
++   print(cov.objects[ic])
++   load(cov.objects[ic])
++   if( !( ("ID" %in% rownames(data)) & ("Capture.Method"  %in% rownames(data)) &  sum(all.QC.column.labels %in% rownames(data))==length(all.QC.column.labels)    ) ){old.cov.object[ic]<-TRUE;next} #the data object denotes it is old
++   if(is.null(cov.all)){cov.all<-cov;chrs.known<-names(cov.all)}else{
++     new.chrs<-names(cov)
++     common.chrs<-new.chrs[new.chrs %in% chrs.known]
++     new.chrs<-new.chrs[!(new.chrs %in% chrs.known)]
++     if(length(common.chrs)>0){
++       for(icc in 1:length(common.chrs)){ cov.all[common.chrs[icc]]<- cov.all[common.chrs[icc]] +  cov[common.chrs[icc]] } # all together chromosomes
++        }
++     if(length(new.chrs)>0){cov.all<-c(cov.all,cov[new.chrs]);print(paste("WARNING new chromosomes:",toString(new.chrs),"WITHIN:", toString(cov.objects),sep=" ")) }
++        } # new cove object 
++   if(is.null(data.all)){data.all<-data}else{data.all<-cbind(data.all,data)}
++ }
++ cov<-cov.all
++ data.all
++ sum(old.cov.object)
++ 
++ cov.objects<-cov.objects[!old.cov.object]
++ rm(cov.all)
++ rm(the.counts)
++  
++ 
++ if(length(cov.objects)<2){next} # there are not enough RDATA files to proceed
++ 
++ 
++ the.readgroup<-the.readgroup[,names(cov.objects)]
++ the.genome<-all.genome[,names(cov.objects)]
++ the.target.files<-all.target.files[names(cov.objects)]
++                              
++ the.sample<-duplicated.samples[i]
++ 
++ the.current.bam<-paste(the.bam.files,collapse=";")
++   
++ a.run<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="FCID:"),collapse=";") # runID
++ ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:"),collapse=";") # genome ref
++ a.lane<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="Lane:"),collapse=";") # LAne
++ a.capture<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Description:"),collapse=";") # capture.tech
++ a.recipe<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:"),collapse=";") # recipe
++ a.sample<-the.sample
++ a.sample.ID<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:"),collapse=";")  # ID
++ a.DS<-paste(the.readgroup["DS",],collapse=";")
++ 
++ 
++  num.genomes.same<-length(unique(the.genome))
++ if(num.genomes.same>1){print(paste("ERROR for",toString(the.bam.files),"genomes differ can't combine",sep=" "));next}
++ 
++  ####################### find the lost inclusive target file and determine it's position in 
++ possible.targets<- extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
++ num.possible.targets<-length(unique(the.genome))
++ if(num.possible.targets==1){ii<-1}else{
++ # possible.capture.methods<-c("TruD:TruX","TruD:NimX","NA") # defined above
++   posns<-match( possible.targets,capture.methods)
++   ii<-which.min(posns)
++ }  #ii not contains the best targets option 
++ 
++   
++   ########################################
++ 
++ targets.file<-the.target.files[[ii]]$targets.file
++   if(is.na(targets.file)){print("ERROR targets file not obtained");next}
++ 
++ if(targets.file != targets.file.ori){
++   load(paste(genomes.path,targets.file,sep="/"))
++   package<-the.target.files[[ii]]$the.ref.genome.library
++   library(package,character.only=TRUE)
++   the.chroms<-seqlengths(eval(as.name(the.target.files[[ii]]$the.ref.genome.object)))
++ 
++   genome(data.gr)<-the.target.files[[ii]]$the.ref.genome
++   gr<-data.gr
++ 
++   rl.from.gr<-as(data.gr, "RangesList") # data.gr contains
++   rl.from.gr.expanded<-rl.from.gr+extend.exons
++   rl.from.gr.expanded<-reduce(rl.from.gr.expanded)
++   targets.file.ori<-targets.file
++ }
++ 
++ human.chromlens<-the.chroms[names(cov)]
++ if(length(human.chromlens)<15){
++   print("WARNING fewer than expected chomosomes")
++   if(length(human.chromlens)<1){ print("ERROR NO chomosomes");next}
++    }
++ 
++ ##   paramAll <- ScanBamParam(scanBamFlag(isUnmappedQuery=NA, isDuplicate=NA, isPaired=NA),what=c("rname"))
++ ## all.reads<-countBam(the.bam.files[ii],param=paramAll) # same as  (total.reads+total.unmapped.reads+total.dup.reads)
++ ##############the reads contain all the sequence reads 
++ total.reads<-sum(as.numeric(as.matrix(data.all["total_mapped_reads",])) , na.rm=TRUE)
++ total.unmapped.reads<-sum(as.numeric(as.matrix(data.all["unmapped_reads",])) , na.rm=TRUE)
++ total.dup.reads<-sum(as.numeric(as.matrix(data.all["total_dup_reads",])) , na.rm=TRUE) ## note this is not really true would need to run picard on the 2 files!
++ sum.total.reads<-sum(as.numeric(as.matrix(data.all["total_reads",])) , na.rm=TRUE)
++ 
++ 
++ ## change Aug 2013
++ 
++ total.unmapped.reads/(sum.total.reads)
++ total.dup.reads/(sum.total.reads-total.unmapped.reads)
++ total.dup.reads/(sum.total.reads) # this is what picard mark duplicated provides
++ 
++ 
++ ## total.unmapped.reads/(total.reads+total.unmapped.reads+total.dup.reads)
++ ## total.dup.reads/(total.reads)
++ ## total.dup.reads/(total.reads+total.unmapped.reads+total.dup.reads) # this is what picard mark duplicated provides
++ 
++   ######################################################
++   #####################################################
++   # Internal loop that processes the cov object
++  setwd(code.dir)
++ source("auto_loop_over_UQCCG_coverage_with_cov.r")
++  setwd(QC.directory)
++   ######################################################
++   #####################################################
++ 
++ ########################## WRITE OUTPUT
++  
++  colnames(data)<-sample.output
++  write.table(data,file=paste(QC.directory,sample.output,sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++  save(list=c("the.counts","cov","data"),file=paste(QC.directory,paste(sample.output,"regions.RData",sep="."),sep="/"))   
++   
++ 
++ if( is.null(on.target.stats) ) { on.target.stats<-data}else{
++  on.target.stats<-cbind(on.target.stats,data)}
++ 
++ k<-k+1
++   
++ #} # sample loop
++ 
++ 
++ 
++ rownames(on.target.stats)<-all.QC.column.labels # may not be set if combed run and non-run samples
++ write.table(on.target.stats,file=paste(QC.directory,paste(projects[ip],"quality.control.summary",sep="."),sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++ 
++ 
++ 
++ ######################Now compile summaries where there are samples with multiple bam files assume these are in the same project file
++ 
++ 
++ 
++ 
++ } # loop over projects
+[1] "RSGB_AML"
+ [1] "AMLM12PAH016K-B_H1178ADXX-1-01.ReCal.sort.bam"
+ [2] "AMLM12PAH016K-B_H1178ADXX-1-06.ReCal.sort.bam"
+ [3] "AMLM12PAH016K-B_H1178ADXX-1-07.ReCal.sort.bam"
+ [4] "AMLM12PAH016K-B_H1178ADXX-1-12.ReCal.sort.bam"
+ [5] "AMLM12PAH016K-B_H1178ADXX-2-01.ReCal.sort.bam"
+ [6] "AMLM12PAH016K-B_H1178ADXX-2-06.ReCal.sort.bam"
+ [7] "AMLM12PAH016K-B_H1178ADXX-2-07.ReCal.sort.bam"
+ [8] "AMLM12PAH016K-B_H1178ADXX-2-12.ReCal.sort.bam"
+ [9] "AMLM12PAH030PGB_H1178ADXX-1-02.ReCal.sort.bam"
+[10] "AMLM12PAH030PGB_H1178ADXX-1-08.ReCal.sort.bam"
+[11] "AMLM12PAH030PGB_H1178ADXX-2-02.ReCal.sort.bam"
+[12] "AMLM12PAH030PGB_H1178ADXX-2-08.ReCal.sort.bam"
+[13] "AMLM12PAH037A-B_H1178ADXX-1-03.ReCal.sort.bam"
+[14] "AMLM12PAH037A-B_H1178ADXX-1-09.ReCal.sort.bam"
+[15] "AMLM12PAH037A-B_H1178ADXX-2-03.ReCal.sort.bam"
+[16] "AMLM12PAH037A-B_H1178ADXX-2-09.ReCal.sort.bam"
+[17] "AMLM12PAH038BJD_H1178ADXX-1-04.ReCal.sort.bam"
+[18] "AMLM12PAH038BJD_H1178ADXX-1-10.ReCal.sort.bam"
+[19] "AMLM12PAH038BJD_H1178ADXX-2-04.ReCal.sort.bam"
+[20] "AMLM12PAH038BJD_H1178ADXX-2-10.ReCal.sort.bam"
+[21] "AMLM12RMH026J-N_H1178ADXX-1-05.ReCal.sort.bam"
+[22] "AMLM12RMH026J-N_H1178ADXX-1-11.ReCal.sort.bam"
+[23] "AMLM12RMH026J-N_H1178ADXX-2-05.ReCal.sort.bam"
+[24] "AMLM12RMH026J-N_H1178ADXX-2-11.ReCal.sort.bam"
+[1] "AMLM12PAH037A-B NOT combined running"
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH037A-B_H1178ADXX-1-03.ReCal.sort.bam 
+                             "AMLM12PAH037A-B_H1178ADXX-1-03.ReCal.sort.QC.regions.RData" 
+
+R version 2.15.0 (2012-03-30)
+Copyright (C) 2012 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> 
+> library(GenomicFeatures)
+Loading required package: BiocGenerics
+
+Attaching package: ‘BiocGenerics’
+
+The following object(s) are masked from ‘package:stats’:
+
+    xtabs
+
+The following object(s) are masked from ‘package:base’:
+
+    anyDuplicated, cbind, colnames, duplicated, eval, Filter, Find,
+    get, intersect, lapply, Map, mapply, mget, order, paste, pmax,
+    pmax.int, pmin, pmin.int, Position, rbind, Reduce, rep.int,
+    rownames, sapply, setdiff, table, tapply, union, unique
+
+Loading required package: IRanges
+Loading required package: GenomicRanges
+> library(multicore)
+> library(Rsamtools)
+Loading required package: Biostrings
+Loading required package: AnnotationDbi
+Loading required package: Biobase
+> 
+> extractReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=FALSE,
++                                          isDuplicate=NA),
++                         what=c("rname", "pos", "cigar"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   ## Note that unmapped reads and reads that are PCR/optical duplicates
++   ## have already been filtered out by using the ScanBamParam object above.
++   irl <- cigarToIRangesListByRName(bam$cigar, bam$rname, bam$pos)
++   irl <- irl[elementLengths(irl) != 0]  # drop empty elements
++   irl
++ }
+> 
+> extractUnmappedReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=TRUE), what=c("qname"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   bam #bam$qname[1:5]
++ }
+> 
+> extract.value.from.info<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,\\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.format<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9\\ \\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.DS<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,:\\+\\ \\.\\-]*",sep="")  #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> ## the.readgroup["DS",]
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Lane:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="ParticipantCode:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:")
+> 
+> 
+> #non.project.directories<-c("Genomes","R-codes","annovar","Sequence_Reads","scripts","bcos_srv"
+>                          
+> 
+> get.readgroup.info<-function(sample.bam,readgroup.labels=c("ID","PL","LB","DS","SM")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   readgroup.cols<- {}
++ 
++   i.ar<-1
++   for(ib in 1:length(the.bam.files)){  ## perhaps different BAm files
++   ## the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@RG"]] # this only provides the FIRST RG
++   the.readgroup.list<-the.header[[the.bam.files[ib]]][["text"]][names(the.header[[the.bam.files[ib]]][["text"]])=="@RG"] ## perhaps many RG per BAm file
++ 
++   for(iread in 1:length(the.readgroup.list)){  # loop over RG
++   the.readgroup<-the.readgroup.list[[iread]]
++ 
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++ 
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])} #get rid of label from text
++   names(the.readgroup)<-the.RG.desc
++   
++   if(i.ar==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup[readgroup.labels,],the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++ 
++   ############### fix the capture technology labels ";" delinates label seperators 
++    if(is.na(a.readgroup["DS",i.ar])){a.readgroup["DS",i.ar]<-"NA"}  # so can just match with text later
++    a.readgroup["DS",i.ar]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX3","TruD:NimX3",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;Agl1.2","TruD:Agl1.2",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar]) # special fix  ;Description:Exome;
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtX","NxtD:NxtX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXR","NxtD:NxtXR",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXE","NxtD:NxtXE",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub(";Description:Exome;",";Description:TruD:NimX;",a.readgroup["DS",i.ar]) # special fix
++    ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   if(!grepl("^NA",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtX",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXR",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXE",a.readgroup["DS",i.ar])     & !grepl("TruD:Agl1.2",a.readgroup["DS",i.ar]) & !grepl("TruD:TruX",a.readgroup["DS",i.ar]) & !grepl("TruD:NimX",a.readgroup["DS",i.ar]) & !grepl("TruD;",a.readgroup["DS",i.ar]) ){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++   
++   i.ar<-i.ar+1
++     }}
++ colnames(a.readgroup)<-readgroup.cols
++   
++  a.readgroup
++ }
+> 
+> get.genome.info<-function(sample.bam,readgroup.labels=c("AS")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   for(ib in 1:length(the.bam.files)){
++   the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@SQ"]] ##only gets the first one
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])}
++   names(the.readgroup)<-the.RG.desc
++ 
++     if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup,the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++   }
++   
++   ## if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];colnames(a.readgroup)[1]<-the.bam.files[ib]}
++   ## else{a.readgroup[names(the.readgroup),ib]<-the.readgroup;colnames(a.readgroup)[ib]<-the.bam.files[ib]}
++   ##   }
++   
++   ##  a.readgroup["DS",ib]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",ib]) # special fix
++   ##  a.readgroup["DS",ib]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",ib]) # special fix
++   ##  ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   ## if(!is.na(a.readgroup["DS",ib]) & (!grepl("TruD:TruX",a.readgroup["DS",ib]) & !grepl("TruD:NimX",a.readgroup["DS",ib]) & !grepl("TruD;",a.readgroup["DS",ib]) )){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++  colnames(a.readgroup)<-readgroup.cols
++ for(ic in 1:dim(a.readgroup)[2]){a.readgroup[is.na(a.readgroup[,ic]),ic]<-"NA"} # replace NA by "NA"
++   a.readgroup
++ }
+> 
+> # sample.bam<-sample.bams[i]
+> get.targets.file<-function(sample.bam){
++ 
++ the.readgroup<-get.readgroup.info(sample.bam) # colnames is the bam file
++ the.genome<-get.genome.info(sample.bam)  # colnames is the bam file
++ the.capture<-extract.value.from.DS(the.readgroup["DS",],match.string="Description:")                                      # colnames is the bam file
++ names(the.capture)<-colnames(the.readgroup)
++ 
++ a.targets.file <- list()
++ 
++ for(i in 1:dim(the.readgroup)[2]){
++   targets.file<-NA
++   from.bam<-colnames(the.readgroup)[i]
++ 
++ ################ Define different capture technologyies used  
++ if(( the.genome["AS",from.bam]=="UCSC_ALL_FULL_CHROMS_HG19.nix") | (the.genome["AS",from.bam]=="NA") ){  # a hg19 genome
++     the.ref.genome<-"hg19";the.ref.genome.library<-"BSgenome.Hsapiens.UCSC.hg19"; the.ref.genome.object<-"Hsapiens" # used to get chromsome lengths
++     if(the.capture[from.bam]=="TruD:TruX"){targets.file<-"Human_Exome_Targets_illumina_v2_hg19_targets.RData"}
++     if(the.capture[from.bam]=="TruD:NimX"){targets.file<-"Human_Exome_Targets_Nimble_v2_hg19_targets.RData"} #(version=="v2")
++     if(the.capture[from.bam]=="TruD:NimX3"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2")TruD;Agl1.2
++     if(the.capture[from.bam]=="TruD:Agl1.2"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2"
++     if(the.capture[from.bam]=="NxtD:NxtX"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXE"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXR"){targets.file<-"NexteraRapidCapture_Exome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]==""){targets.file<-"Human_Exome_Targets_Nimble_v1_hg19_targets.RData"} #(version=="v1")
++ }
++   
++ if(the.genome["AS",from.bam]=="mm9.nix"){
++   the.ref.genome<-"mm9";the.ref.genome.library<-"BSgenome.Mmusculus.UCSC.mm9"; the.ref.genome.object<-"Mmusculus"
++  if(the.capture[from.bam]=="TruD:NimX"){ targets.file<-"Mouse_Exome_Targets_Nimble_v100803_targets.RData"}
++ }
++ ###############
++ 
++ a.target.info<-list(targets.file=targets.file,the.ref.genome=the.ref.genome,the.ref.genome.library=the.ref.genome.library,the.ref.genome.object=the.ref.genome.object)
++ 
++ if(i==1){a.targets.file<-list(a.target.info)}else{a.targets.file<-c(a.targets.file,list(a.target.info))}
++ }
++ 
++ 
++ 
++ names(a.targets.file)<-colnames(the.readgroup)
++ a.targets.file
++ }
+> 
+> 
+> 
+> basesAboveThreshold<-function(x,thresh=0){sum(x>=thresh)}
+> 
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> 
+> 
+> options(show.error.messages = TRUE)
+> possible.capture.methods<-c("TruD:TruX","TruD:NimX","TruD:NimX3","TruD:Agl1.2","NA","NxtD:NxtXE","NxtD:NxtXR")
+> UQCCG.data<-"/mnt/UQCCG/Sequencing/Projects"
+> the.genome<-"hg19" ## the.genome<-"mm9"
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> ############
+> restrict.analysis<-TRUE
+> restrict.to.projects<- c("RSGB_AML")        #AOGC FMHT-N,FTP 
+> restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> #############        
+> 
+> 
+> ## ############
+> ## restrict.analysis<-FALSE
+> ## restrict.to.projects<- ""        #AOGC FMHT-N,FTP 
+> ## restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> ## the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> ## #############
+> 
+> 
+> #############
+> 
+> 
+> genomes.path<-"/mnt/UQCCG/Sequencing/Data/Genomes/hg19" ## path to genomes files
+> force.redo.with.new.ranges<-FALSE # force.redo.with.new.ranges<-TRUE # set true is want to recalculate
+> extend.exons<-200 # all to exons start/end to get additional coverage
+> ##### need to choose one of the below:
+> 
+> 
+> ############################################################################
+> 
+> non.exome.projects<-c("AML-PacBio","BTCK","ALSPAC","AS-WGS","PLD","PLD-whole genome","AML-GENOME","bcos_srv","Mowry","QBI-DISC1")
+> 
+> 
+> 
+> ######################################## no need to change below ###################
+> all.QC.column.labels<-c("ID","Sample","Recipe","Capture.Method","Lane","Run","target_file","total_reads","total_mapped_reads","total_dup_reads","unmapped_reads","total.bases",paste("on.target.bases.",extend.exons,"bp",sep=""),"on.target.bases", "percent.on.target.bases","median.max.coverage", "median.mean.coverage","mean.mean.coverage","percent.ccds.gt.1","percent.ccds.gt.5","percent.ccds.gt.10","percent.ccds.gt.15","percent.ccds.gt.30","percent_Duplicated","percent_Unmapped","Description")
+> 
+> projects<-dir(UQCCG.data)
+> projects<-projects[!(projects %in% non.exome.projects)]
+> projects
+ [1] "2013-06_SKDP_Run"             "2013-12_SKDP_Run"            
+ [3] "ALSPAC_MOVED_di-rdr"          "AML-exome"                   
+ [5] "AML-GENOME_MOVED_di-rdr"      "AML-PacBio_MOVED_TO_TRI"     
+ [7] "AOGC-NGS"                     "Chinese Controls from tulane"
+ [9] "Ch_MND_F"                     "Ch_MND_S"                    
+[11] "DISH"                         "FMHT"                        
+[13] "FMHT-N"                       "IYMD-Lung"                   
+[15] "MODY"                         "new_SKDP-SD"                 
+[17] "NSOG"                         "P01.zip"                     
+[19] "PCC"                          "QIMR-GCJL"                   
+[21] "QIMR-GCJL_MOVED_di-rdr"       "RNSH"                        
+[23] "RSGB_AML"                     "SKDP"                        
+[25] "SKDP-ARGP"                    "SKDP-FAM-10"                 
+[27] "SKDP-FAM-11"                  "SKDP-FAM-12"                 
+[29] "SKDP-FAM-121"                 "SKDP-FAM-13"                 
+[31] "SKDP-FAM-16"                  "SKDP-FAM-168"                
+[33] "SKDP-FAM-171"                 "SKDP-FAM-178"                
+[35] "SKDP-FAM-183"                 "SKDP-FAM-2"                  
+[37] "SKDP-FAM-209"                 "SKDP-FAM-24"                 
+[39] "SKDP-FAM-26"                  "SKDP-FAM-31"                 
+[41] "SKDP-FAM-36"                  "SKDP-FAM-38-Melorheostosis"  
+[43] "SKDP-FAM-4"                   "SKDP-FAM-40"                 
+[45] "SKDP-FAM-41"                  "SKDP-FAM-42"                 
+[47] "SKDP-FAM-44"                  "SKDP-FAM-49"                 
+[49] "SKDP-FAM-51"                  "SKDP-FAM-57"                 
+[51] "SKDP-FAM-6"                   "SKDP-FAM-61"                 
+[53] "SKDP-FAM-66"                  "SKDP-FAM-7"                  
+[55] "SKDP-FAM-70-RUSP"             "SKDP-FAM-71"                 
+[57] "SKDP-FAM-76"                  "SKDP-FAM-77"                 
+[59] "SKDP-FAM-78"                  "SKDP-FAM-80-FOP"             
+[61] "SKDP-FAM-84-Marfan"           "SKDP-FAM-9"                  
+[63] "SKDP-FAM-90"                  "SKDP-FAM-92"                 
+[65] "SKDP-FAM-99"                  "SKDP-FMDP"                   
+[67] "SKDP-MCTO"                    "SKDP-OI"                     
+[69] "SKDP-OI-TypeV"                "SKDP-SD"                     
+[71] "SKDP-SD-OLD"                  "SKDP-SRP"                    
+[73] "TBX21annotation"              "TGCM-AML"                    
+[75] "tulane-FRENCE-control-data"  
+> ##
+> 
+> all.data<-{}
+> count<-0
+> 
+> 
+> if(restrict.analysis){
++   projects<-projects[projects %in% restrict.to.projects]
++ }
+> 
+> print(projects)
+[1] "RSGB_AML"
+> targets.file.ori<-""
+> ####### ip<-1
+> for(ip in 1:length(projects)){
++ print(projects[ip])
++ on.target.stats<-{}  # this will be rebuilt from the individual 
++ 
++ BAM.directory<-paste(UQCCG.data,projects[ip],"BAM",sep="/")
++ x<-try(setwd(BAM.directory ))
++ if(inherits(x, "try-error")){next}
++ 
++ QC.root.directory<-paste(UQCCG.data,projects[ip],"QC",sep="/")
++ xx<-try(setwd( QC.root.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.root.directory,sep=" "));setwd( QC.root.directory  )}
++ 
++ 
++ QC.directory<-paste(UQCCG.data,projects[ip],"QC/AlignedQC",sep="/")
++ xx<-try(setwd( QC.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.directory,sep=" "));setwd( QC.directory);QC.files<-dir(getwd())}else{QC.files<-dir(getwd())}
++   ## QC.files<-QC.files[grepl(".QC$",QC.files)]
++ 
++ 
++ setwd(BAM.directory)
++ files<-dir(getwd())
++ sample.bams<-files[grepl(".bam$",files)] # sample.bams<-sample.bams.ori[48:132] # sample.bams<-sample.bams.ori[1:47] # sample.bams.ori<-sample.bams
++ 
++ if((restrict.to.run=="INCLUDE") | (restrict.to.run=="EXCLUDE")){
++   if(restrict.to.run=="INCLUDE"){
++     wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[wanted]
++   }
++   if(restrict.to.run=="EXCLUDE"){
++         wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[!wanted]
++   }}
++ 
++ print(sample.bams)
++ 
++ 
++ k<-1
++ all.readgroup<-get.readgroup.info(sample.bams)
++ all.genome<-get.genome.info(sample.bams)
++ all.target.files<-get.targets.file(sample.bams)
++   
++ 
++ duplicated.samples<-all.readgroup["SM",][duplicated(all.readgroup["SM",])]
++ 
++  #  merged BAM files with same SM can make 3 apparent files **coverage done at BAM file level not SM level**
++ if(length(names(duplicated.samples)) > length(unique(names(duplicated.samples)) )){
++ duplicated.samples<-duplicated.samples[!duplicated(names(duplicated.samples))] # only unique BAm files
++ duplicated.samples<-duplicated.samples[duplicated(duplicated.samples)] # duplicated samples
++ }
++ 
++ ### added by Mhairi - Jan 2013
++ duplicated.samples <- unique(duplicated.samples)
++ 
++   if(length(duplicated.samples)==0){next}
++ ## 
++ i <- 4
++ #for(i in 1:length(duplicated.samples)){
++   
++ sample.output<-paste(duplicated.samples[i],".combined.ReCal.sort.QC",sep="")   # names of file data is saved to
++ 
++ the.readgroup<-all.readgroup[,all.readgroup["SM",]==duplicated.samples[i] ]
++ the.bam.files<-colnames(the.readgroup)
++ bam.roots<-dirname((the.bam.files))
++ sample.bam.counts<-paste(gsub(".bam$","",basename((the.bam.files))),"QC",sep=".")
++ cov.objects<-paste(sample.bam.counts,"regions.RData",sep=".")
++ names(cov.objects)<-the.bam.files
++ 
++ ######### check the cov.objects exist ##
++ cov.objects<-cov.objects[cov.objects %in% QC.files]
++ 
++ 
++   ###################### already run so skip out
++ if(!force.redo.with.new.ranges){
++   
++ if( (sample.output %in% QC.files) ){ ## probably has been done
++   QC.file.chk<-read.delim(paste(QC.directory,sample.output,sep="/"),header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
++   present<-rownames(QC.file.chk) %in% all.QC.column.labels 
++   QC.file.chk<-subset(QC.file.chk,subset=present)  ### Get rid of extra informtion that might  have been collected
++   
++   if( ("ID" %in% rownames(QC.file.chk)) & ("Capture.Method"  %in% rownames(QC.file.chk)) &  sum(all.QC.column.labels %in% rownames(QC.file.chk))==length(all.QC.column.labels)   ){ # this file has been processed and is ok
++        if( is.null(on.target.stats) ){ on.target.stats<-as.matrix(QC.file.chk[all.QC.column.labels,])}else{on.target.stats<-cbind(on.target.stats,QC.file.chk[all.QC.column.labels,])} # complile on.target.stats
++        print(paste(duplicated.samples[i],"DONE",sep=" "))
++        next# now force skip of analysis below
++                    } 
++ }else{print(paste(duplicated.samples[i],"NOT combined running",sep=" "))}
++ 
++ } # end force redo
++ ##########################
++ 
++ 
++ 
++  ############### load ths coverage objects and check they are up to date
++ 
++  ############### NOte they could be on different genomes with different chromsomes definitions so addition of cov objects could fail the chr hanes are from the targets file
++  ############## so a cov object with all chromsomes is made
++ ############# NOte cov object of different lensthsor with different names can't be simply added together
++ 
++  
++ setwd(QC.directory)
++ old.cov.object<-rep(FALSE,times=length(cov.objects))
++  cov.all<-{}
++  data.all<-{}
++ for(ic in 1:length(cov.objects)){
++   print(cov.objects[ic])
++   load(cov.objects[ic])
++   if( !( ("ID" %in% rownames(data)) & ("Capture.Method"  %in% rownames(data)) &  sum(all.QC.column.labels %in% rownames(data))==length(all.QC.column.labels)    ) ){old.cov.object[ic]<-TRUE;next} #the data object denotes it is old
++   if(is.null(cov.all)){cov.all<-cov;chrs.known<-names(cov.all)}else{
++     new.chrs<-names(cov)
++     common.chrs<-new.chrs[new.chrs %in% chrs.known]
++     new.chrs<-new.chrs[!(new.chrs %in% chrs.known)]
++     if(length(common.chrs)>0){
++       for(icc in 1:length(common.chrs)){ cov.all[common.chrs[icc]]<- cov.all[common.chrs[icc]] +  cov[common.chrs[icc]] } # all together chromosomes
++        }
++     if(length(new.chrs)>0){cov.all<-c(cov.all,cov[new.chrs]);print(paste("WARNING new chromosomes:",toString(new.chrs),"WITHIN:", toString(cov.objects),sep=" ")) }
++        } # new cove object 
++   if(is.null(data.all)){data.all<-data}else{data.all<-cbind(data.all,data)}
++ }
++ cov<-cov.all
++ data.all
++ sum(old.cov.object)
++ 
++ cov.objects<-cov.objects[!old.cov.object]
++ rm(cov.all)
++ rm(the.counts)
++  
++ 
++ if(length(cov.objects)<2){next} # there are not enough RDATA files to proceed
++ 
++ 
++ the.readgroup<-the.readgroup[,names(cov.objects)]
++ the.genome<-all.genome[,names(cov.objects)]
++ the.target.files<-all.target.files[names(cov.objects)]
++                              
++ the.sample<-duplicated.samples[i]
++ 
++ the.current.bam<-paste(the.bam.files,collapse=";")
++   
++ a.run<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="FCID:"),collapse=";") # runID
++ ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:"),collapse=";") # genome ref
++ a.lane<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="Lane:"),collapse=";") # LAne
++ a.capture<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Description:"),collapse=";") # capture.tech
++ a.recipe<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:"),collapse=";") # recipe
++ a.sample<-the.sample
++ a.sample.ID<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:"),collapse=";")  # ID
++ a.DS<-paste(the.readgroup["DS",],collapse=";")
++ 
++ 
++  num.genomes.same<-length(unique(the.genome))
++ if(num.genomes.same>1){print(paste("ERROR for",toString(the.bam.files),"genomes differ can't combine",sep=" "));next}
++ 
++  ####################### find the lost inclusive target file and determine it's position in 
++ possible.targets<- extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
++ num.possible.targets<-length(unique(the.genome))
++ if(num.possible.targets==1){ii<-1}else{
++ # possible.capture.methods<-c("TruD:TruX","TruD:NimX","NA") # defined above
++   posns<-match( possible.targets,capture.methods)
++   ii<-which.min(posns)
++ }  #ii not contains the best targets option 
++ 
++   
++   ########################################
++ 
++ targets.file<-the.target.files[[ii]]$targets.file
++   if(is.na(targets.file)){print("ERROR targets file not obtained");next}
++ 
++ if(targets.file != targets.file.ori){
++   load(paste(genomes.path,targets.file,sep="/"))
++   package<-the.target.files[[ii]]$the.ref.genome.library
++   library(package,character.only=TRUE)
++   the.chroms<-seqlengths(eval(as.name(the.target.files[[ii]]$the.ref.genome.object)))
++ 
++   genome(data.gr)<-the.target.files[[ii]]$the.ref.genome
++   gr<-data.gr
++ 
++   rl.from.gr<-as(data.gr, "RangesList") # data.gr contains
++   rl.from.gr.expanded<-rl.from.gr+extend.exons
++   rl.from.gr.expanded<-reduce(rl.from.gr.expanded)
++   targets.file.ori<-targets.file
++ }
++ 
++ human.chromlens<-the.chroms[names(cov)]
++ if(length(human.chromlens)<15){
++   print("WARNING fewer than expected chomosomes")
++   if(length(human.chromlens)<1){ print("ERROR NO chomosomes");next}
++    }
++ 
++ ##   paramAll <- ScanBamParam(scanBamFlag(isUnmappedQuery=NA, isDuplicate=NA, isPaired=NA),what=c("rname"))
++ ## all.reads<-countBam(the.bam.files[ii],param=paramAll) # same as  (total.reads+total.unmapped.reads+total.dup.reads)
++ ##############the reads contain all the sequence reads 
++ total.reads<-sum(as.numeric(as.matrix(data.all["total_mapped_reads",])) , na.rm=TRUE)
++ total.unmapped.reads<-sum(as.numeric(as.matrix(data.all["unmapped_reads",])) , na.rm=TRUE)
++ total.dup.reads<-sum(as.numeric(as.matrix(data.all["total_dup_reads",])) , na.rm=TRUE) ## note this is not really true would need to run picard on the 2 files!
++ sum.total.reads<-sum(as.numeric(as.matrix(data.all["total_reads",])) , na.rm=TRUE)
++ 
++ 
++ ## change Aug 2013
++ 
++ total.unmapped.reads/(sum.total.reads)
++ total.dup.reads/(sum.total.reads-total.unmapped.reads)
++ total.dup.reads/(sum.total.reads) # this is what picard mark duplicated provides
++ 
++ 
++ ## total.unmapped.reads/(total.reads+total.unmapped.reads+total.dup.reads)
++ ## total.dup.reads/(total.reads)
++ ## total.dup.reads/(total.reads+total.unmapped.reads+total.dup.reads) # this is what picard mark duplicated provides
++ 
++   ######################################################
++   #####################################################
++   # Internal loop that processes the cov object
++  setwd(code.dir)
++ source("auto_loop_over_UQCCG_coverage_with_cov.r")
++  setwd(QC.directory)
++   ######################################################
++   #####################################################
++ 
++ ########################## WRITE OUTPUT
++  
++  colnames(data)<-sample.output
++  write.table(data,file=paste(QC.directory,sample.output,sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++  save(list=c("the.counts","cov","data"),file=paste(QC.directory,paste(sample.output,"regions.RData",sep="."),sep="/"))   
++   
++ 
++ if( is.null(on.target.stats) ) { on.target.stats<-data}else{
++  on.target.stats<-cbind(on.target.stats,data)}
++ 
++ k<-k+1
++   
++ #} # sample loop
++ 
++ 
++ 
++ rownames(on.target.stats)<-all.QC.column.labels # may not be set if combed run and non-run samples
++ write.table(on.target.stats,file=paste(QC.directory,paste(projects[ip],"quality.control.summary",sep="."),sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++ 
++ 
++ 
++ ######################Now compile summaries where there are samples with multiple bam files assume these are in the same project file
++ 
++ 
++ 
++ 
++ } # loop over projects
+[1] "RSGB_AML"
+ [1] "AMLM12PAH016K-B_H1178ADXX-1-01.ReCal.sort.bam"
+ [2] "AMLM12PAH016K-B_H1178ADXX-1-06.ReCal.sort.bam"
+ [3] "AMLM12PAH016K-B_H1178ADXX-1-07.ReCal.sort.bam"
+ [4] "AMLM12PAH016K-B_H1178ADXX-1-12.ReCal.sort.bam"
+ [5] "AMLM12PAH016K-B_H1178ADXX-2-01.ReCal.sort.bam"
+ [6] "AMLM12PAH016K-B_H1178ADXX-2-06.ReCal.sort.bam"
+ [7] "AMLM12PAH016K-B_H1178ADXX-2-07.ReCal.sort.bam"
+ [8] "AMLM12PAH016K-B_H1178ADXX-2-12.ReCal.sort.bam"
+ [9] "AMLM12PAH030PGB_H1178ADXX-1-02.ReCal.sort.bam"
+[10] "AMLM12PAH030PGB_H1178ADXX-1-08.ReCal.sort.bam"
+[11] "AMLM12PAH030PGB_H1178ADXX-2-02.ReCal.sort.bam"
+[12] "AMLM12PAH030PGB_H1178ADXX-2-08.ReCal.sort.bam"
+[13] "AMLM12PAH037A-B_H1178ADXX-1-03.ReCal.sort.bam"
+[14] "AMLM12PAH037A-B_H1178ADXX-1-09.ReCal.sort.bam"
+[15] "AMLM12PAH037A-B_H1178ADXX-2-03.ReCal.sort.bam"
+[16] "AMLM12PAH037A-B_H1178ADXX-2-09.ReCal.sort.bam"
+[17] "AMLM12PAH038BJD_H1178ADXX-1-04.ReCal.sort.bam"
+[18] "AMLM12PAH038BJD_H1178ADXX-1-10.ReCal.sort.bam"
+[19] "AMLM12PAH038BJD_H1178ADXX-2-04.ReCal.sort.bam"
+[20] "AMLM12PAH038BJD_H1178ADXX-2-10.ReCal.sort.bam"
+[21] "AMLM12RMH026J-N_H1178ADXX-1-05.ReCal.sort.bam"
+[22] "AMLM12RMH026J-N_H1178ADXX-1-11.ReCal.sort.bam"
+[23] "AMLM12RMH026J-N_H1178ADXX-2-05.ReCal.sort.bam"
+[24] "AMLM12RMH026J-N_H1178ADXX-2-11.ReCal.sort.bam"
+Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.
+
+[1] "AMLM12PAH038BJD NOT combined running"
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH038BJD_H1178ADXX-1-04.ReCal.sort.bam 
+                             "AMLM12PAH038BJD_H1178ADXX-1-04.ReCal.sort.QC.regions.RData" 
+> library(multicore)
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH030PGB_H1178ADXX-1-08.ReCal.sort.bam 
+                             "AMLM12PAH030PGB_H1178ADXX-1-08.ReCal.sort.QC.regions.RData" 
+> library(Rsamtools)
+Loading required package: Biostrings
+> 
+> extractReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=FALSE,
++                                          isDuplicate=NA),
++                         what=c("rname", "pos", "cigar"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   ## Note that unmapped reads and reads that are PCR/optical duplicates
++   ## have already been filtered out by using the ScanBamParam object above.
++   irl <- cigarToIRangesListByRName(bam$cigar, bam$rname, bam$pos)
++   irl <- irl[elementLengths(irl) != 0]  # drop empty elements
++   irl
++ }
+> 
+> extractUnmappedReadsFromBAM <- function(file) # Get reads but take cigar into account
++ {
++   ## This ScanBamParam object allows us to load only the necessary
++   ## information from the file.
++   param <- ScanBamParam(flag=scanBamFlag(isUnmappedQuery=TRUE), what=c("qname"))
++   
++   bam <- scanBam(file, param=param)[[1]]
++   bam #bam$qname[1:5]
++ }
+> 
+> extract.value.from.info<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,\\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.format<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9\\ \\.]*",sep="") #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> 
+> extract.value.from.DS<-function(info,match.string){ #will be fooled if have GGMAF=  #ok if GMAF not present need [^;]
++ match.string.general<-paste(match.string,"[a-zA-Z0-9,:\\+\\ \\.\\-]*",sep="")  #regexec(";GMAF=[a-zA-Z0-9,\\.]*;",indels[has.gmaf,"INFO"]) ";" not needed
++ match<- regexec(match.string.general,info)
++ start<-unlist(match)
++ length<-unlist(lapply(match,function(x)  attr(x,"match.length")))
++ end<-start+length-1 # minus one to get last position
++ start<-start+nchar(as.character(match.string))
++ substr(info,start=start,stop=end)
++ }
+> ## the.readgroup["DS",]
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Lane:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="ParticipantCode:")
+> ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:")
+> 
+> 
+> #non.project.directories<-c("Genomes","R-codes","annovar","Sequence_Reads","scripts","bcos_srv"
+>                          
+> 
+> get.readgroup.info<-function(sample.bam,readgroup.labels=c("ID","PL","LB","DS","SM")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   readgroup.cols<- {}
++ 
++   i.ar<-1
++   for(ib in 1:length(the.bam.files)){  ## perhaps different BAm files
++   ## the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@RG"]] # this only provides the FIRST RG
++   the.readgroup.list<-the.header[[the.bam.files[ib]]][["text"]][names(the.header[[the.bam.files[ib]]][["text"]])=="@RG"] ## perhaps many RG per BAm file
++ 
++   for(iread in 1:length(the.readgroup.list)){  # loop over RG
++   the.readgroup<-the.readgroup.list[[iread]]
++ 
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++ 
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])} #get rid of label from text
++   names(the.readgroup)<-the.RG.desc
++   
++   if(i.ar==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup[readgroup.labels,],the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++ 
++   ############### fix the capture technology labels ";" delinates label seperators 
++    if(is.na(a.readgroup["DS",i.ar])){a.readgroup["DS",i.ar]<-"NA"}  # so can just match with text later
++    a.readgroup["DS",i.ar]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX3","TruD:NimX3",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;Agl1.2","TruD:Agl1.2",a.readgroup["DS",i.ar]) # special fix
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar]) # special fix  ;Description:Exome;
++    a.readgroup["DS",i.ar]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtX","NxtD:NxtX",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXR","NxtD:NxtXR",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub("NxtD;NxtXE","NxtD:NxtXE",a.readgroup["DS",i.ar])
++    a.readgroup["DS",i.ar]<-gsub(";Description:Exome;",";Description:TruD:NimX;",a.readgroup["DS",i.ar]) # special fix
++    ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   if(!grepl("^NA",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtX",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXR",a.readgroup["DS",i.ar]) & !grepl("NxtD:NxtXE",a.readgroup["DS",i.ar])     & !grepl("TruD:Agl1.2",a.readgroup["DS",i.ar]) & !grepl("TruD:TruX",a.readgroup["DS",i.ar]) & !grepl("TruD:NimX",a.readgroup["DS",i.ar]) & !grepl("TruD;",a.readgroup["DS",i.ar]) ){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++   
++   i.ar<-i.ar+1
++     }}
++ colnames(a.readgroup)<-readgroup.cols
++   
++  a.readgroup
++ }
+> 
+> get.genome.info<-function(sample.bam,readgroup.labels=c("AS")){ #returms a matrix of readgroups
++   the.header<-scanBamHeader(sample.bam) # list with names is sample.bams is a vertor then it does all of them at once!
++   the.bam.files<-names(the.header)
++   a.readgroup<-matrix(data=NA,nrow=length(readgroup.labels),ncol=1)
++   rownames(a.readgroup)<-readgroup.labels
++   for(ib in 1:length(the.bam.files)){
++   the.readgroup<-the.header[[the.bam.files[ib]]][["text"]][["@SQ"]] ##only gets the first one
++   the.RG.desc<-unlist(lapply(strsplit(the.readgroup,split=":"),function(x) x[1]))
++   for(ir in 1:length(the.readgroup)){the.readgroup[ir]<-gsub(paste("^",the.RG.desc[ir],":",sep=""),"",the.readgroup[ir])}
++   names(the.readgroup)<-the.RG.desc
++ 
++     if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];readgroup.cols<-the.bam.files[ib]}else{
++     a.readgroup<-cbind(a.readgroup,the.readgroup[readgroup.labels])
++     readgroup.cols<-c(readgroup.cols,the.bam.files[ib])
++   }
++   }
++   
++   ## if(ib==1){a.readgroup[readgroup.labels,1]<-the.readgroup[readgroup.labels];colnames(a.readgroup)[1]<-the.bam.files[ib]}
++   ## else{a.readgroup[names(the.readgroup),ib]<-the.readgroup;colnames(a.readgroup)[ib]<-the.bam.files[ib]}
++   ##   }
++   
++   ##  a.readgroup["DS",ib]<-gsub("TruD;TruX","TruD:TruX",a.readgroup["DS",ib]) # special fix
++   ##  a.readgroup["DS",ib]<-gsub("TruD;NimX","TruD:NimX",a.readgroup["DS",ib]) # special fix
++   ##  ## "NA" nimblegen v1 - "TruD:NimX" nimblegen v2 - "TruD:TruX" illumina v2 - "TruD;" whole genome
++   ## if(!is.na(a.readgroup["DS",ib]) & (!grepl("TruD:TruX",a.readgroup["DS",ib]) & !grepl("TruD:NimX",a.readgroup["DS",ib]) & !grepl("TruD;",a.readgroup["DS",ib]) )){print("WARNING unknown capture technology in description field - see subroutine get.readgroup.info")}
++  colnames(a.readgroup)<-readgroup.cols
++ for(ic in 1:dim(a.readgroup)[2]){a.readgroup[is.na(a.readgroup[,ic]),ic]<-"NA"} # replace NA by "NA"
++   a.readgroup
++ }
+> 
+> # sample.bam<-sample.bams[i]
+> get.targets.file<-function(sample.bam){
++ 
++ the.readgroup<-get.readgroup.info(sample.bam) # colnames is the bam file
++ the.genome<-get.genome.info(sample.bam)  # colnames is the bam file
++ the.capture<-extract.value.from.DS(the.readgroup["DS",],match.string="Description:")                                      # colnames is the bam file
++ names(the.capture)<-colnames(the.readgroup)
++ 
++ a.targets.file <- list()
++ 
++ for(i in 1:dim(the.readgroup)[2]){
++   targets.file<-NA
++   from.bam<-colnames(the.readgroup)[i]
++ 
++ ################ Define different capture technologyies used  
++ if(( the.genome["AS",from.bam]=="UCSC_ALL_FULL_CHROMS_HG19.nix") | (the.genome["AS",from.bam]=="NA") ){  # a hg19 genome
++     the.ref.genome<-"hg19";the.ref.genome.library<-"BSgenome.Hsapiens.UCSC.hg19"; the.ref.genome.object<-"Hsapiens" # used to get chromsome lengths
++     if(the.capture[from.bam]=="TruD:TruX"){targets.file<-"Human_Exome_Targets_illumina_v2_hg19_targets.RData"}
++     if(the.capture[from.bam]=="TruD:NimX"){targets.file<-"Human_Exome_Targets_Nimble_v2_hg19_targets.RData"} #(version=="v2")
++     if(the.capture[from.bam]=="TruD:NimX3"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2")TruD;Agl1.2
++     if(the.capture[from.bam]=="TruD:Agl1.2"){targets.file<-"Human_Exome_Targets_Nimble_v3_hg19_targets.RData"} #(version=="v2"
++     if(the.capture[from.bam]=="NxtD:NxtX"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXE"){targets.file<-"NexteraRapidCapture_ExpandedExome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]=="NxtD:NxtXR"){targets.file<-"NexteraRapidCapture_Exome_TargetedRegions_hg19_targets.RData"}
++     if(the.capture[from.bam]==""){targets.file<-"Human_Exome_Targets_Nimble_v1_hg19_targets.RData"} #(version=="v1")
++ }
++   
++ if(the.genome["AS",from.bam]=="mm9.nix"){
++   the.ref.genome<-"mm9";the.ref.genome.library<-"BSgenome.Mmusculus.UCSC.mm9"; the.ref.genome.object<-"Mmusculus"
++  if(the.capture[from.bam]=="TruD:NimX"){ targets.file<-"Mouse_Exome_Targets_Nimble_v100803_targets.RData"}
++ }
++ ###############
++ 
++ a.target.info<-list(targets.file=targets.file,the.ref.genome=the.ref.genome,the.ref.genome.library=the.ref.genome.library,the.ref.genome.object=the.ref.genome.object)
++ 
++ if(i==1){a.targets.file<-list(a.target.info)}else{a.targets.file<-c(a.targets.file,list(a.target.info))}
++ }
++ 
++ 
++ 
++ names(a.targets.file)<-colnames(the.readgroup)
++ a.targets.file
++ }
+> 
+> 
+> 
+> basesAboveThreshold<-function(x,thresh=0){sum(x>=thresh)}
+> 
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> 
+> 
+> options(show.error.messages = TRUE)
+> possible.capture.methods<-c("TruD:TruX","TruD:NimX","TruD:NimX3","TruD:Agl1.2","NA","NxtD:NxtXE","NxtD:NxtXR")
+> UQCCG.data<-"/mnt/UQCCG/Sequencing/Projects"
+> the.genome<-"hg19" ## the.genome<-"mm9"
+> code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts"
+> 
+> ############
+> restrict.analysis<-TRUE
+> restrict.to.projects<- c("RSGB_AML")        #AOGC FMHT-N,FTP 
+> restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> #############        
+> 
+> 
+> ## ############
+> ## restrict.analysis<-FALSE
+> ## restrict.to.projects<- ""        #AOGC FMHT-N,FTP 
+> ## restrict.to.run<-"" # "ALL" # "INCLUDE" # "EXCLUDE"
+> ## the.run<-"" # only used with "INCLUDE" AND "EXCLUDE"
+> ## #############
+> 
+> 
+> #############
+> 
+> 
+> genomes.path<-"/mnt/UQCCG/Sequencing/Data/Genomes/hg19" ## path to genomes files
+> force.redo.with.new.ranges<-FALSE # force.redo.with.new.ranges<-TRUE # set true is want to recalculate
+> extend.exons<-200 # all to exons start/end to get additional coverage
+> ##### need to choose one of the below:
+> 
+> 
+> ############################################################################
+> 
+> non.exome.projects<-c("AML-PacBio","BTCK","ALSPAC","AS-WGS","PLD","PLD-whole genome","AML-GENOME","bcos_srv","Mowry","QBI-DISC1")
+> 
+> 
+> 
+> ######################################## no need to change below ###################
+> all.QC.column.labels<-c("ID","Sample","Recipe","Capture.Method","Lane","Run","target_file","total_reads","total_mapped_reads","total_dup_reads","unmapped_reads","total.bases",paste("on.target.bases.",extend.exons,"bp",sep=""),"on.target.bases", "percent.on.target.bases","median.max.coverage", "median.mean.coverage","mean.mean.coverage","percent.ccds.gt.1","percent.ccds.gt.5","percent.ccds.gt.10","percent.ccds.gt.15","percent.ccds.gt.30","percent_Duplicated","percent_Unmapped","Description")
+> 
+> projects<-dir(UQCCG.data)
+> projects<-projects[!(projects %in% non.exome.projects)]
+> projects
+ [1] "2013-06_SKDP_Run"             "2013-12_SKDP_Run"            
+ [3] "ALSPAC_MOVED_di-rdr"          "AML-exome"                   
+ [5] "AML-GENOME_MOVED_di-rdr"      "AML-PacBio_MOVED_TO_TRI"     
+ [7] "AOGC-NGS"                     "Chinese Controls from tulane"
+ [9] "Ch_MND_F"                     "Ch_MND_S"                    
+[11] "DISH"                         "FMHT"                        
+[13] "FMHT-N"                       "IYMD-Lung"                   
+[15] "MODY"                         "new_SKDP-SD"                 
+[17] "NSOG"                         "P01.zip"                     
+[19] "PCC"                          "QIMR-GCJL"                   
+[21] "QIMR-GCJL_MOVED_di-rdr"       "RNSH"                        
+[23] "RSGB_AML"                     "SKDP"                        
+[25] "SKDP-ARGP"                    "SKDP-FAM-10"                 
+[27] "SKDP-FAM-11"                  "SKDP-FAM-12"                 
+[29] "SKDP-FAM-121"                 "SKDP-FAM-13"                 
+[31] "SKDP-FAM-16"                  "SKDP-FAM-168"                
+[33] "SKDP-FAM-171"                 "SKDP-FAM-178"                
+[35] "SKDP-FAM-183"                 "SKDP-FAM-2"                  
+[37] "SKDP-FAM-209"                 "SKDP-FAM-24"                 
+[39] "SKDP-FAM-26"                  "SKDP-FAM-31"                 
+[41] "SKDP-FAM-36"                  "SKDP-FAM-38-Melorheostosis"  
+[43] "SKDP-FAM-4"                   "SKDP-FAM-40"                 
+[45] "SKDP-FAM-41"                  "SKDP-FAM-42"                 
+[47] "SKDP-FAM-44"                  "SKDP-FAM-49"                 
+[49] "SKDP-FAM-51"                  "SKDP-FAM-57"                 
+[51] "SKDP-FAM-6"                   "SKDP-FAM-61"                 
+[53] "SKDP-FAM-66"                  "SKDP-FAM-7"                  
+[55] "SKDP-FAM-70-RUSP"             "SKDP-FAM-71"                 
+[57] "SKDP-FAM-76"                  "SKDP-FAM-77"                 
+[59] "SKDP-FAM-78"                  "SKDP-FAM-80-FOP"             
+[61] "SKDP-FAM-84-Marfan"           "SKDP-FAM-9"                  
+[63] "SKDP-FAM-90"                  "SKDP-FAM-92"                 
+[65] "SKDP-FAM-99"                  "SKDP-FMDP"                   
+[67] "SKDP-MCTO"                    "SKDP-OI"                     
+[69] "SKDP-OI-TypeV"                "SKDP-SD"                     
+[71] "SKDP-SD-OLD"                  "SKDP-SRP"                    
+[73] "TBX21annotation"              "TGCM-AML"                    
+[75] "tulane-FRENCE-control-data"  
+> ##
+> 
+> all.data<-{}
+> count<-0
+> 
+> 
+> if(restrict.analysis){
++   projects<-projects[projects %in% restrict.to.projects]
++ }
+> 
+> print(projects)
+[1] "RSGB_AML"
+> targets.file.ori<-""
+> ####### ip<-1
+> for(ip in 1:length(projects)){
++ print(projects[ip])
++ on.target.stats<-{}  # this will be rebuilt from the individual 
++ 
++ BAM.directory<-paste(UQCCG.data,projects[ip],"BAM",sep="/")
++ x<-try(setwd(BAM.directory ))
++ if(inherits(x, "try-error")){next}
++ 
++ QC.root.directory<-paste(UQCCG.data,projects[ip],"QC",sep="/")
++ xx<-try(setwd( QC.root.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.root.directory,sep=" "));setwd( QC.root.directory  )}
++ 
++ 
++ QC.directory<-paste(UQCCG.data,projects[ip],"QC/AlignedQC",sep="/")
++ xx<-try(setwd( QC.directory  ),silent=TRUE)
++ if(inherits(xx, "try-error")){system(paste("mkdir",QC.directory,sep=" "));setwd( QC.directory);QC.files<-dir(getwd())}else{QC.files<-dir(getwd())}
++   ## QC.files<-QC.files[grepl(".QC$",QC.files)]
++ 
++ 
++ setwd(BAM.directory)
++ files<-dir(getwd())
++ sample.bams<-files[grepl(".bam$",files)] # sample.bams<-sample.bams.ori[48:132] # sample.bams<-sample.bams.ori[1:47] # sample.bams.ori<-sample.bams
++ 
++ if((restrict.to.run=="INCLUDE") | (restrict.to.run=="EXCLUDE")){
++   if(restrict.to.run=="INCLUDE"){
++     wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[wanted]
++   }
++   if(restrict.to.run=="EXCLUDE"){
++         wanted<-rep(FALSE,length(sample.bams))
++     for(irun in 1:length(the.run)){wanted<-wanted | grepl(the.run[irun],sample.bams)}  # grep("21",sample.bams)
++     sample.bams<-sample.bams[!wanted]
++   }}
++ 
++ print(sample.bams)
++ 
++ 
++ k<-1
++ all.readgroup<-get.readgroup.info(sample.bams)
++ all.genome<-get.genome.info(sample.bams)
++ all.target.files<-get.targets.file(sample.bams)
++   
++ 
++ duplicated.samples<-all.readgroup["SM",][duplicated(all.readgroup["SM",])]
++ 
++  #  merged BAM files with same SM can make 3 apparent files **coverage done at BAM file level not SM level**
++ if(length(names(duplicated.samples)) > length(unique(names(duplicated.samples)) )){
++ duplicated.samples<-duplicated.samples[!duplicated(names(duplicated.samples))] # only unique BAm files
++ duplicated.samples<-duplicated.samples[duplicated(duplicated.samples)] # duplicated samples
++ }
++ 
++ ### added by Mhairi - Jan 2013
++ duplicated.samples <- unique(duplicated.samples)
++ 
++   if(length(duplicated.samples)==0){next}
++ ## 
++ i <- 5
++ #for(i in 1:length(duplicated.samples)){
++   
++ sample.output<-paste(duplicated.samples[i],".combined.ReCal.sort.QC",sep="")   # names of file data is saved to
++ 
++ the.readgroup<-all.readgroup[,all.readgroup["SM",]==duplicated.samples[i] ]
++ the.bam.files<-colnames(the.readgroup)
++ bam.roots<-dirname((the.bam.files))
++ sample.bam.counts<-paste(gsub(".bam$","",basename((the.bam.files))),"QC",sep=".")
++ cov.objects<-paste(sample.bam.counts,"regions.RData",sep=".")
++ names(cov.objects)<-the.bam.files
++ 
++ ######### check the cov.objects exist ##
++ cov.objects<-cov.objects[cov.objects %in% QC.files]
++ 
++ 
++   ###################### already run so skip out
++ if(!force.redo.with.new.ranges){
++   
++ if( (sample.output %in% QC.files) ){ ## probably has been done
++   QC.file.chk<-read.delim(paste(QC.directory,sample.output,sep="/"),header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
++   present<-rownames(QC.file.chk) %in% all.QC.column.labels 
++   QC.file.chk<-subset(QC.file.chk,subset=present)  ### Get rid of extra informtion that might  have been collected
++   
++   if( ("ID" %in% rownames(QC.file.chk)) & ("Capture.Method"  %in% rownames(QC.file.chk)) &  sum(all.QC.column.labels %in% rownames(QC.file.chk))==length(all.QC.column.labels)   ){ # this file has been processed and is ok
++        if( is.null(on.target.stats) ){ on.target.stats<-as.matrix(QC.file.chk[all.QC.column.labels,])}else{on.target.stats<-cbind(on.target.stats,QC.file.chk[all.QC.column.labels,])} # complile on.target.stats
++        print(paste(duplicated.samples[i],"DONE",sep=" "))
++        next# now force skip of analysis below
++                    } 
++ }else{print(paste(duplicated.samples[i],"NOT combined running",sep=" "))}
++ 
++ } # end force redo
++ ##########################
++ 
++ 
++ 
++  ############### load ths coverage objects and check they are up to date
++ 
++  ############### NOte they could be on different genomes with different chromsomes definitions so addition of cov objects could fail the chr hanes are from the targets file
++  ############## so a cov object with all chromsomes is made
++ ############# NOte cov object of different lensthsor with different names can't be simply added together
++ 
++  
++ setwd(QC.directory)
++ old.cov.object<-rep(FALSE,times=length(cov.objects))
++  cov.all<-{}
++  data.all<-{}
++ for(ic in 1:length(cov.objects)){
++   print(cov.objects[ic])
++   load(cov.objects[ic])
++   if( !( ("ID" %in% rownames(data)) & ("Capture.Method"  %in% rownames(data)) &  sum(all.QC.column.labels %in% rownames(data))==length(all.QC.column.labels)    ) ){old.cov.object[ic]<-TRUE;next} #the data object denotes it is old
++   if(is.null(cov.all)){cov.all<-cov;chrs.known<-names(cov.all)}else{
++     new.chrs<-names(cov)
++     common.chrs<-new.chrs[new.chrs %in% chrs.known]
++     new.chrs<-new.chrs[!(new.chrs %in% chrs.known)]
++     if(length(common.chrs)>0){
++       for(icc in 1:length(common.chrs)){ cov.all[common.chrs[icc]]<- cov.all[common.chrs[icc]] +  cov[common.chrs[icc]] } # all together chromosomes
++        }
++     if(length(new.chrs)>0){cov.all<-c(cov.all,cov[new.chrs]);print(paste("WARNING new chromosomes:",toString(new.chrs),"WITHIN:", toString(cov.objects),sep=" ")) }
++        } # new cove object 
++   if(is.null(data.all)){data.all<-data}else{data.all<-cbind(data.all,data)}
++ }
++ cov<-cov.all
++ data.all
++ sum(old.cov.object)
++ 
++ cov.objects<-cov.objects[!old.cov.object]
++ rm(cov.all)
++ rm(the.counts)
++  
++ 
++ if(length(cov.objects)<2){next} # there are not enough RDATA files to proceed
++ 
++ 
++ the.readgroup<-the.readgroup[,names(cov.objects)]
++ the.genome<-all.genome[,names(cov.objects)]
++ the.target.files<-all.target.files[names(cov.objects)]
++                              
++ the.sample<-duplicated.samples[i]
++ 
++ the.current.bam<-paste(the.bam.files,collapse=";")
++   
++ a.run<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="FCID:"),collapse=";") # runID
++ ## extract.value.from.DS(the.readgroup["DS",],match.string="SampleRef:"),collapse=";") # genome ref
++ a.lane<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="Lane:"),collapse=";") # LAne
++ a.capture<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Description:"),collapse=";") # capture.tech
++ a.recipe<- paste(extract.value.from.DS(the.readgroup["DS",],match.string="Recipe:"),collapse=";") # recipe
++ a.sample<-the.sample
++ a.sample.ID<-paste(extract.value.from.DS(the.readgroup["DS",],match.string="SampleID:"),collapse=";")  # ID
++ a.DS<-paste(the.readgroup["DS",],collapse=";")
++ 
++ 
++  num.genomes.same<-length(unique(the.genome))
++ if(num.genomes.same>1){print(paste("ERROR for",toString(the.bam.files),"genomes differ can't combine",sep=" "));next}
++ 
++  ####################### find the lost inclusive target file and determine it's position in 
++ possible.targets<- extract.value.from.DS(the.readgroup["DS",],match.string="Description:")
++ num.possible.targets<-length(unique(the.genome))
++ if(num.possible.targets==1){ii<-1}else{
++ # possible.capture.methods<-c("TruD:TruX","TruD:NimX","NA") # defined above
++   posns<-match( possible.targets,capture.methods)
++   ii<-which.min(posns)
++ }  #ii not contains the best targets option 
++ 
++   
++   ########################################
++ 
++ targets.file<-the.target.files[[ii]]$targets.file
++   if(is.na(targets.file)){print("ERROR targets file not obtained");next}
++ 
++ if(targets.file != targets.file.ori){
++   load(paste(genomes.path,targets.file,sep="/"))
++   package<-the.target.files[[ii]]$the.ref.genome.library
++   library(package,character.only=TRUE)
++   the.chroms<-seqlengths(eval(as.name(the.target.files[[ii]]$the.ref.genome.object)))
++ 
++   genome(data.gr)<-the.target.files[[ii]]$the.ref.genome
++   gr<-data.gr
++ 
++   rl.from.gr<-as(data.gr, "RangesList") # data.gr contains
++   rl.from.gr.expanded<-rl.from.gr+extend.exons
++   rl.from.gr.expanded<-reduce(rl.from.gr.expanded)
++   targets.file.ori<-targets.file
++ }
++ 
++ human.chromlens<-the.chroms[names(cov)]
++ if(length(human.chromlens)<15){
++   print("WARNING fewer than expected chomosomes")
++   if(length(human.chromlens)<1){ print("ERROR NO chomosomes");next}
++    }
++ 
++ ##   paramAll <- ScanBamParam(scanBamFlag(isUnmappedQuery=NA, isDuplicate=NA, isPaired=NA),what=c("rname"))
++ ## all.reads<-countBam(the.bam.files[ii],param=paramAll) # same as  (total.reads+total.unmapped.reads+total.dup.reads)
++ ##############the reads contain all the sequence reads 
++ total.reads<-sum(as.numeric(as.matrix(data.all["total_mapped_reads",])) , na.rm=TRUE)
++ total.unmapped.reads<-sum(as.numeric(as.matrix(data.all["unmapped_reads",])) , na.rm=TRUE)
++ total.dup.reads<-sum(as.numeric(as.matrix(data.all["total_dup_reads",])) , na.rm=TRUE) ## note this is not really true would need to run picard on the 2 files!
++ sum.total.reads<-sum(as.numeric(as.matrix(data.all["total_reads",])) , na.rm=TRUE)
++ 
++ 
++ ## change Aug 2013
++ 
++ total.unmapped.reads/(sum.total.reads)
++ total.dup.reads/(sum.total.reads-total.unmapped.reads)
++ total.dup.reads/(sum.total.reads) # this is what picard mark duplicated provides
++ 
++ 
++ ## total.unmapped.reads/(total.reads+total.unmapped.reads+total.dup.reads)
++ ## total.dup.reads/(total.reads)
++ ## total.dup.reads/(total.reads+total.unmapped.reads+total.dup.reads) # this is what picard mark duplicated provides
++ 
++   ######################################################
++   #####################################################
++   # Internal loop that processes the cov object
++  setwd(code.dir)
++ source("auto_loop_over_UQCCG_coverage_with_cov.r")
++  setwd(QC.directory)
++   ######################################################
++   #####################################################
++ 
++ ########################## WRITE OUTPUT
++  
++  colnames(data)<-sample.output
++  write.table(data,file=paste(QC.directory,sample.output,sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++  save(list=c("the.counts","cov","data"),file=paste(QC.directory,paste(sample.output,"regions.RData",sep="."),sep="/"))   
++   
++ 
++ if( is.null(on.target.stats) ) { on.target.stats<-data}else{
++  on.target.stats<-cbind(on.target.stats,data)}
++ 
++ k<-k+1
++   
++ #} # sample loop
++ 
++ 
++ 
++ rownames(on.target.stats)<-all.QC.column.labels # may not be set if combed run and non-run samples
++ write.table(on.target.stats,file=paste(QC.directory,paste(projects[ip],"quality.control.summary",sep="."),sep="/"),col.names=TRUE,row.names=TRUE,sep="\t",quote=FALSE)
++ 
++ 
++ 
++ ######################Now compile summaries where there are samples with multiple bam files assume these are in the same project file
++ 
++ 
++ 
++ 
++ } # loop over projects
+[1] "RSGB_AML"
+ [1] "AMLM12PAH016K-B_H1178ADXX-1-01.ReCal.sort.bam"
+ [2] "AMLM12PAH016K-B_H1178ADXX-1-06.ReCal.sort.bam"
+ [3] "AMLM12PAH016K-B_H1178ADXX-1-07.ReCal.sort.bam"
+ [4] "AMLM12PAH016K-B_H1178ADXX-1-12.ReCal.sort.bam"
+ [5] "AMLM12PAH016K-B_H1178ADXX-2-01.ReCal.sort.bam"
+ [6] "AMLM12PAH016K-B_H1178ADXX-2-06.ReCal.sort.bam"
+ [7] "AMLM12PAH016K-B_H1178ADXX-2-07.ReCal.sort.bam"
+ [8] "AMLM12PAH016K-B_H1178ADXX-2-12.ReCal.sort.bam"
+ [9] "AMLM12PAH030PGB_H1178ADXX-1-02.ReCal.sort.bam"
+[10] "AMLM12PAH030PGB_H1178ADXX-1-08.ReCal.sort.bam"
+[11] "AMLM12PAH030PGB_H1178ADXX-2-02.ReCal.sort.bam"
+[12] "AMLM12PAH030PGB_H1178ADXX-2-08.ReCal.sort.bam"
+[13] "AMLM12PAH037A-B_H1178ADXX-1-03.ReCal.sort.bam"
+[14] "AMLM12PAH037A-B_H1178ADXX-1-09.ReCal.sort.bam"
+[15] "AMLM12PAH037A-B_H1178ADXX-2-03.ReCal.sort.bam"
+[16] "AMLM12PAH037A-B_H1178ADXX-2-09.ReCal.sort.bam"
+[17] "AMLM12PAH038BJD_H1178ADXX-1-04.ReCal.sort.bam"
+[18] "AMLM12PAH038BJD_H1178ADXX-1-10.ReCal.sort.bam"
+[19] "AMLM12PAH038BJD_H1178ADXX-2-04.ReCal.sort.bam"
+[20] "AMLM12PAH038BJD_H1178ADXX-2-10.ReCal.sort.bam"
+[21] "AMLM12RMH026J-N_H1178ADXX-1-05.ReCal.sort.bam"
+[22] "AMLM12RMH026J-N_H1178ADXX-1-11.ReCal.sort.bam"
+[23] "AMLM12RMH026J-N_H1178ADXX-2-05.ReCal.sort.bam"
+[24] "AMLM12RMH026J-N_H1178ADXX-2-11.ReCal.sort.bam"
+[1] "AMLM12RMH026J-N NOT combined running"
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12RMH026J-N_H1178ADXX-1-05.ReCal.sort.bam 
+                             "AMLM12RMH026J-N_H1178ADXX-1-05.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH037A-B_H1178ADXX-1-09.ReCal.sort.bam 
+                             "AMLM12PAH037A-B_H1178ADXX-1-09.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH038BJD_H1178ADXX-1-10.ReCal.sort.bam 
+                             "AMLM12PAH038BJD_H1178ADXX-1-10.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12RMH026J-N_H1178ADXX-1-11.ReCal.sort.bam 
+                             "AMLM12RMH026J-N_H1178ADXX-1-11.ReCal.sort.QC.regions.RData" 
+
+R version 2.15.0 (2012-03-30)
+Copyright (C) 2012 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> 
+> library(GenomicFeatures)
+Loading required package: BiocGenerics
+
+Attaching package: ‘BiocGenerics’
+
+The following object(s) are masked from ‘package:stats’:
+
+    xtabs
+
+The following object(s) are masked from ‘package:base’:
+
+    anyDuplicated, cbind, colnames, duplicated, eval, Filter, Find,
+    get, intersect, lapply, Map, mapply, mget, order, paste, pmax,
+    pmax.int, pmin, pmin.int, Position, rbind, Reduce, rep.int,
+    rownames, sapply, setdiff, table, tapply, union, unique
+
+Loading required package: IRanges
+
+Execution halted
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH038BJD_H1178ADXX-2-04.ReCal.sort.bam 
+                             "AMLM12PAH038BJD_H1178ADXX-2-04.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH037A-B_H1178ADXX-2-03.ReCal.sort.bam 
+                             "AMLM12PAH037A-B_H1178ADXX-2-03.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH030PGB_H1178ADXX-2-02.ReCal.sort.bam 
+                             "AMLM12PAH030PGB_H1178ADXX-2-02.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12RMH026J-N_H1178ADXX-2-05.ReCal.sort.bam 
+                             "AMLM12RMH026J-N_H1178ADXX-2-05.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH038BJD_H1178ADXX-2-10.ReCal.sort.bam 
+                             "AMLM12PAH038BJD_H1178ADXX-2-10.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH037A-B_H1178ADXX-2-09.ReCal.sort.bam 
+                             "AMLM12PAH037A-B_H1178ADXX-2-09.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12PAH030PGB_H1178ADXX-2-08.ReCal.sort.bam 
+                             "AMLM12PAH030PGB_H1178ADXX-2-08.ReCal.sort.QC.regions.RData" 
+/mnt/UQCCG/Sequencing/Projects/RSGB_AML/BAM/AMLM12RMH026J-N_H1178ADXX-2-11.ReCal.sort.bam 
+                             "AMLM12RMH026J-N_H1178ADXX-2-11.ReCal.sort.QC.regions.RData" 
+Loading required package: BSgenome
+
+Attaching package: ‘BSgenome’
+
+The following object(s) are masked from ‘package:AnnotationDbi’:
+
+    species
+
+Loading required package: BSgenome
+
+Attaching package: ‘BSgenome’
+
+The following object(s) are masked from ‘package:AnnotationDbi’:
+
+    species
+
+Loading required package: BSgenome
+
+Attaching package: ‘BSgenome’
+
+The following object(s) are masked from ‘package:AnnotationDbi’:
+
+    species
+
+[1] 4270433340
+[1] 48.23692
+[1] 28.66864
+[1] "-------------------"
+[1] 4615437720
+[1] 49.87872
+[1] 29.60391
+[1] "-------------------"
+Loading required package: BSgenome
+
+Attaching package: ‘BSgenome’
+
+The following object(s) are masked from ‘package:AnnotationDbi’:
+
+    species
+
+[1] 4870475875
+[1] 48.43731
+[1] 28.95695
+[1] "-------------------"
+[1] 4575605955
+[1] 48.93496
+[1] 29.12604
+[1] "-------------------"
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 

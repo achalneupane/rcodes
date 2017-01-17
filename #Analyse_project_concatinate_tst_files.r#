@@ -1,0 +1,184 @@
+/media/UQCCG/Sequencing/Data/Sequence_Genotypes/2014-06-24_AML_RSGB_AOGC_withHaplotypeCaller/Analysis/2014-06-24_AML_RSGB_AOGC_withHaplotypeCaller.chr21.ALL.ALL_GENOTYPES_analysis.txt
+
+
+
+args <- commandArgs(TRUE)
+ichr <- args[1]
+ichr <- as.numeric(ichr)
+#ichr <- 10
+# ichr <- 22
+the.chr.index<-c(1:24)
+
+Skip.Analysis<-TRUE
+
+
+
+#ichr<-23
+
+#for(ichr in 1:24){
+  
+
+  
+
+UQCCG.data<-"/media/UQCCG/Sequencing/Data/Sequence_Genotypes"
+#UQCCG.data<-"/media/UQCCG/Sequencing/Data/Sequence_Genotypes"
+#project<-"2014-06-24_AML_RSGB_AOGC_withHaplotypeCaller" # this is the project directory
+project<-"2014-06-24_AML_RSGB_AOGC_withHaplotypeCaller" # this is the project directory
+project.name <- project
+project.extension<- ".ALL_GENOTYPES_analysis-maf-filtered.txt"
+fam<-"ALL" #
+
+# name is:   project.name| "variable-chr" | fam | project.extension
+
+analysis.dir<-paste(UQCCG.data,project,"Analysis",sep="/")
+
+
+affection.status.file<-"no_file" # sample_sheet from demutiplex , coverage_file - coverge file , no_file
+# the.sample.sheet<-"/mnt/UQCCG/Sequencing/Data/Sequence_Genotypes/2014-03-19_MND_MODY_LKAF_Nimbelgen/BAM/Ch_MND_SampleSheet.csv"
+the.sample.sheet<-"/media/UQCCG/Sequencing/Data/Sequence_Genotypes/2014-07-21_LeoPharma_1st_NexteraSamples/BAM/LeoPharmaV2_QC_stat_SAMPLE_Mon_Jul_21_2014.csv"
+restrict.family<-c("ALL") #nor required for affection.status.file="no_file"- set to "ALL" ALL or from "Project" in coverge or "SampleProject"  in samplesheet
+
+
+############################################################
+
+
+code.dir<-"/mnt/UQCCG/Programming/VersionControl_GitRepository/UQCCG_Pipeline_Rscripts/"
+
+
+#############################################################################################################
+############################################# BEGIN #######################################################
+options(stringsASFactors=FALSE)
+options(width=250,max.print=5000)
+
+library(GenomicFeatures)
+library(Rsamtools)
+#require(biomaRt)
+library(DBI)
+library(RMySQL)
+library(multicore)
+library(foreach)  ## could not get this to work well
+library(doMC)
+if(!exists("num.cores")){num.cores<-12}
+registerDoMC(cores=num.cores)
+
+
+setwd(code.dir)
+## source("ucsc.table.names.r") 
+                                        # load in the UCSC tables these use the db file names and not their lable-names 
+source("annotate_SNPs_subroutines.r")
+
+##################################################################################                   
+######################################### Predefined variables required
+##################################################################################
+files<-dir(analysis.dir)
+the.extension<-paste(project.extension,"$",sep="")
+files<-files[grepl(the.extension ,files)]
+if(fam=="ALL" | fam=="All" | fam=="all"){
+  fam<-unique(unlist( mapply(function(x){x[length(x)]}, strsplit(gsub(the.extension,"",files),split=".",fixed=TRUE)   )))
+}
+
+
+
+the.extension<-paste(fam[ifam],project.extension,"$",sep="")
+project.files<-files[grepl(the.extension ,files)]
+print(sort(paste("Doing: ",project.files,sep=""))) # project.files<-project.files[1:22]
+
+indels<-{}
+the.col<-{}
+project.files
+#
+ichr<-1
+
+
+
+for(ichr in 1:length(project.files)){
+
+setwd(analysis.dir)
+################## fast read ###########
+column.labels<-read.delim(project.files[ichr],header=F,nrows=1,sep="\t",fill=TRUE,stringsAsFactors=FALSE,na.strings="",quote="\"")
+num.vars<-dim(column.labels)[2]
+a.indel<-scan(project.files[ichr],what=character(num.vars),skip=1,sep="\t",fill=TRUE,na.strings="",quote="\"")
+num.lines<-length(a.indel)/(num.vars)
+dim(a.indel)<-c(num.vars,num.lines)
+a.indel<-t(a.indel)
+colnames(a.indel)<-column.labels
+########################################
+the.chr<-unique(a.indel[,"chr"])
+print(paste("Doing Chromosome ",the.chr))
+
+if(sum(!grepl("^chr",the.chr))>0){
+a.indel[,"chr"]<-paste("chr",a.indel[,"chr"],sep="")
+}
+
+a.indel[1:50,"chr"]
+key<-build.key(a.indel,core.ann)
+rownames(a.indel)<-key
+rownames(a.indel)[1:5]
+#tapply(gene.list[,"CHR"],gene.list[,"CHR"],length)
+all.possible.samples<-gsub(".GT$","",colnames(a.indel)[grep(".GT$",colnames(a.indel))],perl=TRUE)
+length(all.possible.samples)
+
+dim(a.indel)
+
+
+
+
+} #loop over faimilies ifam
+
+
+
+} # length(all.sample.labels)>0 that is SKIP analysis and just output summary
+
+print("PROJECT PIPELINE FINISHED......")
+
+if(length(all.sample.labels)<=0){
+ 
+if(class(Gene.Names)=="list"){print("Error Gene.Names a list: L1338");Gene.Names<-unlist(lapply(Gene.Names,function(x) paste(x,collapse="::")))}
+annotation.in.filter.table<-c("Consequence",extra.vep.annotations)
+
+colnames(filter.table.pholy)<-gsub(".Embl","",colnames(filter.table.pholy))
+filter.table.annotation<-colnames(filter.table.pholy) %in% annotation.in.filter.table
+colnames(filter.table.pholy)[filter.table.annotation]<-paste(colnames(filter.table.pholy)[filter.table.annotation],".Embl",sep="")
+
+gene.desc.table.labels.wanted<-c("Description","Gene.Biotype") # gene.desc.table.labels.wanted<-c("description")
+gene.desc.table.labels.other<-colnames(gene.desc.table)[!( colnames(gene.desc.table) %in% gene.desc.table.labels.wanted )]
+
+unwanted.columns<-c("refGene" ,"knownGene", "ensGene","gene.table",
+                    "snp132::found","1000genome","snp132","CG69","EUR_ASN_AFR_INDEL","ALL_EXON_SNP","1000genomeV2.txt","RNSH_FMHT_maf.txt","ljb_pp2","avsift","ljb_mt","ljb_phylop",
+                    colnames(filter.table)[grepl("::maf-filter",colnames(filter.table))],
+                     colnames(regionanno.table)[grepl("::HIT",colnames(regionanno.table))],filter.cols.maf.0
+                    )
+## ##########################################################################################################################################################
+## ############## below use only for annotation output
+  filter.table.pholy[1:5,]
+  gene.desc.table.labels.wanted<-c("Description","Gene.Biotype") # gene.desc.table.labels.wanted<-c("description")
+  gene.desc.table.labels.other<-colnames(gene.desc.table)[!( colnames(gene.desc.table) %in% gene.desc.table.labels.wanted )]
+
+  summary<-cbind(indels,geneanno.table,Gene.Names,gene.desc.table[,gene.desc.table.labels.wanted],gene.table,filter.table.pholy[,filter.table.annotation],wanted.muts,wanted.muts.coding,maf.lt.all,gerp.scores,filter.table.pholy[,c("PolyPhen.desc","PolyPhen.scores","SIFT.desc","SIFT.scores")],gene.desc.table[,gene.desc.table.labels.other],regionanno.table,filter.table)
+
+
+  dim(summary)
+  unwanted.columns<-c("junk","shit","SHIT","JUNK","crap")
+  unwanted.columns.full<-c(unwanted.columns,colnames(summary)[grepl("^key",colnames(summary))]) # remove the unwanted "key columns"
+  summary<-summary[,colnames(summary)[ !(colnames(summary) %in% unwanted.columns.full)]]
+  if(exists("family.name.prefix")){
+                                        #file.out.name<-paste(project,family.name.prefix,sep=".")
+    file.out.name<-paste(gsub(".txt$","",target),family.name.prefix,sep=".")
+  }else{file.out.name<-gsub(".txt$","",target)}
+  paste(file.out.name,"analysis.txt",sep=".")
+  getwd()
+  xx<-try(setwd( analysis.dir  ))
+  if(inherits(xx, "try-error")){system(paste("mkdir",paste("'",analysis.dir,"'",sep=""),sep=" "));setwd( analysis.dir  )}
+
+  write.table(summary,file=paste(file.out.name,"ALL_GENOTYPES_analysis.txt",sep="."),col.names=TRUE,row.names=FALSE,sep="\t",quote=FALSE)
+############## below use only for annotation output
+## ##########################################################################################################################################################
+} # length(all.sample.labels)<=0
+  
+
+#} # ichr loop over projects
+
+
+if(affection.status.file=="no.file" | affection.status.file=="no_file"){
+write.table(sample.sheet.full,file=paste(file.out.name,"Sample_Sheet_NEW.txt",sep="."),col.names=TRUE,row.names=FALSE,sep="\t",quote=FALSE)
+}

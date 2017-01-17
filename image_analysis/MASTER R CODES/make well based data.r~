@@ -1,0 +1,23 @@
+
+
+################################ this just concatinates the well data into a single file
+############################### use Add well based data to sort out missing info etc
+
+setwd("/media/scratch/Data/Cellomics/millian")
+#list well files
+files.wells<-dir(getwd())
+files.wells<-files.wells[grep("well",files.wells)]
+files.wells
+
+###########################
+#concatinate well data
+data.well<-{}
+for(i in 1:length(files.wells)){
+  data<-read.delim(files.wells[i],header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
+  data.well<-rbind(data.well,data)
+}
+
+dim(data.well)
+ write.table(cell.counts,"well_based_data.txt",row.names=FALSE,sep="\t")
+
+

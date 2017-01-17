@@ -1,0 +1,266 @@
+######## restart here $$$$$$$$$$$$$$$$$$$$
+
+
+load("/media/old-scratch/media/Bioinform-D/Research/Cellomics/millian/data.si FB2.RData")
+
+load("/media/old-scratch/media/Bioinform-D/Research/Cellomics/millian/data.si FB3.RData")
+
+
+> ls()
+[1] "a.screen"      "hits.high.rep" "hits.low.rep"  "summary"      
+[5] "the.cells"     "the.screen"
+
+plk1<-summary[,"Symbol"]=="PLK1"
+dim(summary)
+summary[plk1,28]
+test<-strsplit(as.character(summary[plk1,28]),split=",")
+nrow<-length(test)
+ncol<-5
+test[1:5]
+data<-unlist(test)
+data<-matrix(data=data,nrow=nrow,ncol=ncol,byrow=TRUE)
+data[1:5,]
+table(data[,5])
+table(data[,4])
+table(data[,3])
+
+sum(data[,5]==" -")
+sum(data[,4]==" -")
+sum(data[,3]==" +")
+
+sum(data[,5]==" -" | data[,4]==" -" | data[,3]==" +")
+
+data[data[,5]!=" -",]
+a.test<-grepl("x$",summary[,28])  & plk1
+colnames(summary)
+summary[a.test,c(1:4,8,28)]
+table(summary[data[,5]!=" -",1:5])
+
+setwd("/media/old-scratch/media/Bioinform-D/Research/Cellomics/millian")
+library("gplots")
+library("scatterplot3d")
+load("working.RData")
+
+######################################################################### BEGIN DIMENSIONAL ANALYSIS
+
+ColSideColors=rep("black",times=dim(data)[1])
+ColSideColors[rownames(data) %in% conf.hits]<-"green"
+## ColSideColors[rownames(data) %in% "PLK1"]<-"green"
+ColSideColors[rownames(data) %in% my.2nd.hits]<-"orange"
+ColSideColors[rownames(data) %in% my.hits]<-"red"
+rownames(data)[rownames(data) %in% my.hits]
+
+colsep<-grep(FALSE, ColSideColors=="black")
+sepcolor<-ColSideColors[colsep]
+               
+data[rownames(data) %in% conf.hits,]
+data2[rownames(data2) %in% conf.hits,]
+data3[rownames(data3) %in% conf.hits,]
+
+targets
+
+ targets<-c("S+G2/G1","% Edu","AK leakage","Resazurin","Cell Number")
+ #targets<-c("ak_leakage","resazurin","Num-cells")
+
+colnames(data)<-targets
+colnames(data3)<-targets
+colnames(data2)<-targets
+targets<-c("AK leakage","Resazurin","Cell Number")
+data<-data[,targets]
+data3<-data3[,targets]
+data2<-data2[,targets]
+
+data[1:5,]
+
+data2["PLK1",]
+
+cell.lines
+sum(rownames(data3)!=rownames(data2)) # shoudl be zero
+data3[1:5,]
+no.current.hit.3<-apply(data3[,targets],1,function(x) sum(x==0)==length(x))
+data3[no.current.hit.3,][1:10,]
+
+data2[1:5,]
+no.current.hit.2<-apply(data2[,targets],1,function(x) sum(x==0)==length(x))
+data2[no.current.hit.2,][1:10,]
+
+sum(no.current.hit.2 & no.current.hit.3)  ## 29 cound remove
+no.current.hit<-no.current.hit.2 & no.current.hit.3
+
+data<-data[!no.current.hit,]
+
+
+#### made via
+## data3<- data.all[all.screens[,"Cell Line"] %in% cell.lines[3],]
+## data2<- data.all[all.screens[,"Cell Line"] %in% cell.lines[2],]
+## data
+
+
+## data<-data3-data2  ## Fawau caski-c33q()
+
+
+## colorss.ori<-colorss
+## #colorss<-bluered(max(data)*4)
+## color = colorRampPalette(c("blue","red"))
+## colorss<-color(max(data)*4) #  color = colorRampPalette(c("blue","red"))
+## colorss<-colorss[c(-2,-3,-4,-5,-6)]
+
+## the.heat<-heatmap.2(data,margins=c(8,8))
+## the.heat<-heatmap.2(t(data),margins=c(5,9),trace="row",ColSideColors=ColSideColors,keysize=1.0,cex.lab=1.5)
+
+##Choose  number of clusters
+centers<-6
+centers
+
+colours<-rainbow(centers)
+do.pca<-TRUE
+
+##########################################################################
+par(mar=c(5.1,5.1,4.1,2.1),mgp=c(3,1,0),las=1)
+
+
+par(mar=c(0,0,1.1,1.1),mgp=c(3,1,6),las=1) 
+gene.cl<-hclust(dist((data)))
+gene.cl.members<-cutree(gene.cl,k=centers)
+
+#colours[gene.cl.members[grep("AURKA",names(gene.cl.members))]]<-"black"
+colours[gene.cl.members[grep("TTK",names(gene.cl.members))]]<-"blueviolet"
+colours[gene.cl.members[grep("AKT1",names(gene.cl.members))]]<-"darkgreen"
+colours[gene.cl.members[grep("MAK",names(gene.cl.members))]]<-"cyan1"
+
+par(mar=c(5.1,5.1,4.1,2.1),mgp=c(3,1,0),las=1) 
+the.heat<-heatmap.2(t(data),margins=c(5,15),trace="row",ColSideColors=colours[gene.cl.members],keysize=1.2,cex.lab=15.0,main="",xlab="",labCol="Genes",cexCol=3.0,srtCol=0,adjCol=c(-1.75,1.4))
+
+
+## text(1:366,0,labels=rownames(data)[the.heat$colInd],cex=1.0,font=2 )
+## axis(2,at=1:366,labels=rownames(data)[the.heat$colInd],cex.axis=1.25,font=2 )
+## seq(0,1,1/(dim(data)[1]-1))
+## test<-seq(0,1,1/(dim(data)[1]-1))
+## axis(1,at=(0.2 + 1/log10(dim(data)[1])),labels=rownames(data)[the.heat$colInd],lty=1,lwd=2,cex.axis=2.0,font=2) ##cexRow CexCol labCol=FALSE
+## the.heat<-heatmap.2(t(data),margins=c(5,9),trace="row",ColSideColors=ColSideColors,colsep=colsep,sepcolor=sepcolor,keysize=1.0,cex.lab=1.5,main="Heatmap of differential hits")
+## heatmap.2(as.matrix(data),Colv=patients.reorder,col=colorss,dendrogram="none",key=TRUE,keysize=1.47,scale="none", symkey=FALSE, density.info="none", trace="none",Rowv=FALSE,main="Citrullinated Antigen",ylab="Cytokine",margins=c(7,5),xlab="Patient :: CCP Status :: Number of Alleles")
+grep("AURKA",rownames(the.heat$carpet))
+
+
+plot.name<-"milliam distance clustering CASKI-C33.jpeg"
+
+savePlot(paste(plot.name,"jpeg",sep="."),type="jpeg")
+savePlot(paste(plot.name,"tiff",sep="."),type="tiff")
+
+par(mar=c(5.1,5.1,4.1,2.1),mgp=c(3,1,0),las=1) 
+
+the.pca <- prcomp(data,scale = TRUE) # for hits/genes
+attributes(the.pca )
+dim(the.pca$x)
+
+the.pca.var <- round(the.pca$sdev^2 / sum(the.pca$sdev^2)*100,2)
+plot(c(1:length(the.pca.var)),the.pca.var,type="b",xlab="# components",ylab="% variance",main="Scree Plot for Hits",col="red",cex=1.5,cex.lab=1.5)
+savePlot("millian scree plot new .jpeg",type="jpeg")
+
+the.cl<-kmeans(the.pca$x[,1:2],centers=centers,iter.max=1000,nstart=50) #Do kmeans
+plot(range(the.pca$x[,1]),range(the.pca$x[,2]),xlab="Principle Component 1",ylab="Principle Component 2",main="",cex.axis=2.0,cex.lab=2.0,col="white")
+
+#plot(range(the.pca$x[,1]),range(the.pca$x[,2]),xlim=c(-3,2),ylim=c(-1.5,1.5),xlab="PCA1",ylab="PCA2",main="Spectral clustering of differential hits")
+## the.cl$cluster[grep("AURKA",names(the.cl$cluster))]
+## colours[the.cl$cluster[grep("AURKA",names(the.cl$cluster))]]<-"black"
+
+## s3d<-scatterplot3d(c(-5,4),c(-2,1),c(0,2),xlab="PCA1",ylab="PCA2",zlab="PCA3",main="Spectral clustering of differential hits",angle=120)
+## text(s3d$xyz.convert(the.pca$x[,1],the.pca$x[,2],the.pca$x[,3]),label=rownames(the.pca$x),col=colours[the.cl$cluster],cex=1.0)
+## points(s3d$xyz.convert(the.pca$x[wanted,1],the.pca$x[wanted,2],the.pca$x[wanted,3]),col=color,cex=7.0)
+gene.cl.members[grep("PLK1",names(gene.cl.members))]
+gene.cl.members[grep("AKT1",names(gene.cl.members))]
+gene.cl.members[grep("AURKA",names(gene.cl.members))]
+not.wanted<-rownames(the.pca$x) %in% c("old control","cellonly","NT","mediaonly")
+in.group<-gene.cl.members==1
+
+dups<-duplicated(signif(the.pca$x[,2],3))
+the.pca$x[dups & in.group,2]<-the.pca$x[dups & in.group,2]+0.1
+dups<-duplicated(signif(the.pca$x[,2],3))
+the.pca$x[dups & in.group,2]<-the.pca$x[dups & in.group,2]+0.1
+dups<-duplicated(signif(the.pca$x[,2],3))
+the.pca$x[dups & in.group,2]<-the.pca$x[dups & in.group,2]+0.1
+
+gene.cl.members[grep("AURKA",names(gene.cl.members))]
+in.group<-gene.cl.members==3
+dups<-duplicated(signif(the.pca$x[,2],3))
+the.pca$x[dups & in.group,2]<-the.pca$x[dups & in.group,2]+0.1
+
+
+
+in.group<-gene.cl.members==6
+dups<-duplicated(signif(the.pca$x[,2],3))
+the.pca$x[dups & in.group,2]<-the.pca$x[dups & in.group,2]+0.1
+
+to.read<-rownames(the.pca$x)=="WEE1"
+the.pca$x[to.read,2]<-the.pca$x[to.read,2]+0.2
+
+to.read<-rownames(the.pca$x)=="PLK1"
+the.pca$x[to.read,2]<-the.pca$x[to.read,2]-0.1
+
+in.group<-gene.cl.members==2
+dups<-duplicated(signif(the.pca$x[,2],3))
+the.pca$x[dups & in.group,2]<-the.pca$x[dups & in.group,2]+0.1
+
+#text(the.pca$x[,1],the.pca$x[,2],label=rownames(the.pca$x),col=colours[the.cl$cluster],cex=0.85,font=2)
+ sum(names(the.cl$cluster)!=names(gene.cl.members))
+
+
+ text(the.pca$x[,1],the.pca$x[,2],label=rownames(the.pca$x),col=colours[gene.cl.members],cex=0.85,font=2)
+
+## bp<-plot(as.numeric(vec[include,eig1]),as.numeric(vec[include,eig2]),pch=pch.array, cex=1.35,lwd=1.0,col = color.array[include], xlim=range.eig1,ylim=range.eig2,main="",xlab=eig1, ylab=eig2,cex.lab=2.0,cex.axis=2.0)
+
+
+
+
+wanted<-rownames(the.pca$x) %in% c("AURKA","AURKB","WEE1","GSG2","PLK1")
+points(the.pca$x[wanted,1],the.pca$x[wanted,2],col="black",cex=8.0,cex.lab=15.0)
+
+
+
+plot.name<-"Millian spectral"
+savePlot(paste(plot.name,"jpeg",sep="."),type="jpeg")
+savePlot(paste(plot.name,"tiff",sep="."),type="tiff")
+
+
+## dotchart(the.pca$x[,1:3],labels=as.character(rownames(the.pca$x)))
+################### choose one
+the.test<-my.hits
+color<-"red"
+
+the.test<-my.2nd.hits
+color<-"Orange"
+
+the.test<-conf.hits
+color<-"forestgreen"
+###########################
+
+
+wanted<-rownames(the.pca$x) %in% the.test
+points(the.pca$x[wanted,1],the.pca$x[wanted,2],col=color,cex=8.0,cex.lab=15.0)
+
+savePlot(paste(plot.name,"jpeg",sep="."),type="jpeg")
+savePlot(paste(plot.name,"tiff",sep="."),type="tiff")
+
+all.summary[1:5,]
+
+
+
+the.pca$x[1:5,]
+gene.cl.members
+the.pca.vecs<-the.pca$x
+all.summary.new<-all.summary
+colnames(all.summary.new)
+all.summary.new<-all.summary.new[,c(-18,-19,-20)]
+all.summary.new[1:5,]
+
+the.genes<-unique(rownames(the.pca.vecs))
+for(i in 1:length(the.genes)){
+loc<-rownames(all.summary.new) %in% the.genes[i]
+
+ all.summary.new[loc,  c("PC1","PC2","PC3")]<-matrix((rep(the.pca.vecs[the.genes[i],  c("PC1","PC2","PC3")],times=sum(loc))),nrow=3,ncol=sum(loc),byrow=TRUE)
+ all.summary.new[loc,  c("cluster ID")]<-t(rep(gene.cl.members[the.genes[i]],times=sum(loc)))
+}
+
+ all.summary.new[1:5,]
+  
+write.table(all.summary.new,"combined.summary.4.millian.figures.txt",row.names=FALSE,sep="\t")

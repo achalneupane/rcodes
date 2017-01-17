@@ -1,0 +1,72 @@
+
+
+
+
+############################################### Ca screen
+setwd( "/media/Bioinform-D/Research/Cellomics/Ca screen")
+load("Ca_ann.RData")
+
+sum.vars<-c("plate","row","col","Symbol","Trans_%","%R","Z-all Green","Z-Low Green","Z-Mid Green","Z-High Green","RG","RG_expected","RG_sd","RG_Low","RG_Low_expected","RG_Mid","RG_Mid_expected","RG_High","RG_High_expected","R","RnotG","G","nG","G_Low","G_Mid","G_High","Relative S+G2","Relative S+G2+>4N","Relative <2N","Relative >4N","Relative S","G2/G1 for fit","G1 posn", "Fit quality G","Fit quality nG","Num-cells","score","RG/G","RnG/nG","nR","gt4N","Total","<cells_field>","sd_cells_field","S+G2/G1","S+G2+ >4N/G1","<2N",">4N","S","Entrez_ID","Cell_loc","Description","Gene.ID","Accession.Number","GI.Number","Library.Type")
+
+the.screen<-"Ca siRNA"
+
+############ dump excell files to tab delimed files 
+files<- paste("Ca_siCa_",unique(ann[,"plate"]),"_SUMMARY",".RData",sep="")
+field.output.file<-"Ca_field_summary_NOTGREEN_DNA.txt"
+well.output.file<-"Ca_summary_NOTGREEN_DNA.txt"
+normalized.file<-paste(the.screen,"NORMALIZED2","txt",sep=".")
+well.type<-384
+row.type<-16
+col.type<-24
+
+map.file<-"cellomics.to.expt.map.csv"
+exported.well.data<-"Well_based_data.csv"
+##################### reda in file#####################
+
+plates.all<-read.delim(well.output.file,header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE) ##Unnormalized
+normalized<-read.delim(normalized.file,header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE) ##Normalized
+map<-read.delim(map.file,header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE) 
+exported<-read.delim(exported.well.data,header=T,sep="\t",fill=TRUE,stringsAsFactors=FALSE)
+
+
+########## rename export columns # remove clank lines:
+exported<-exported[!is.na(exported[,"Row"]),]
+
+tapply(exported[,"UPD"],exported[,"UPD"],length)
+#UPDs<-tapply(exported[,"UPD"],exported[,"UPD"],length)
+UPDs<-unique(exported[,"UPD"])
+posns<- match(exported[,"UPD"],UPDs)
+exported<-cbind(Plate=map[posns,"Plate"],exported)
+
+exported[,"Col"] <- exported[,"Col"]+1
+exported[,"Row"] <- exported[,"Row"]+1
+col.index<-c("A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z")
+exported[,"Row"] <- col.index[exported[,"Row"]]
+########remap
+## order.wanted<-paste(ann[,"plate"],ann[,"row"],ann[,"col"])
+order.wanted<-paste(normalized[,"plate"],normalized[,"row"],normalized[,"col"])
+rownames(ann)<-order.wanted
+order.have<-paste(exported[,"Plate"] ,exported[,"Row"] ,exported[,"Col"] )
+posns<-match(order.wanted,order.have)
+present<-!is.na(posns)
+posns<-posns[present]
+test<-exported[posns,]
+######## remap and export
+## rownames(norm.ori)<-paste(norm.ori[,"plate"],norm.ori[,"row"],norm.ori[,"col"])
+## rownames(normalized)<-paste(normalized[,"plate"],normalized[,"row"],normalized[,"col"])
+## rownames(exported)<-paste(exported[,"Plate"] ,exported[,"Row"] ,exported[,"Col"] )
+
+ori.size<-ncol(normalized)+1
+normalized<-cbind(normalized,matrix(data=NA,nrow=nrow(normalized),ncol=ncol(exported)))
+colnames(normalized)[ori.size:ncol(normalized)]<-colnames(exported)
+normalized[present,colnames(exported)]<-exported[posns,]
+## normalized[rownames(exported),colnames(exported)]<-exported # goes with rownames method
+
+## normalized[1:100,c(1:3,57,60:63)]
+## sum(is.na(normalized[,57]))
+## normalized[is.na(normalized[,57]),c(1:3,57,60:63)]
+
+write.table(normalized,paste(the.screen,"NORMALIZED2","Wells","txt",sep="."),col.names=TRUE,row.names=FALSE,sep="\t")
+
+## col.index<-c("A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z")
+#colnames(normalized)[67:68]<- c("MEAN_P2A","SD_P2A") 
