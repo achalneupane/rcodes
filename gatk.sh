@@ -124,7 +124,7 @@ samtools view -H ${sortedBAM}BD143_TGACCA_L006.sorted.bam
 samtools view -H ${sortedBAM}BD143_TGACCA_merged.sorted.bam
 samtools view -H ${sortedBAM}BD143_TGACCA_merged.dedup.bam
 
-rm ${sortedBAM}BD143_TGACCA_L00*.sorted
+rm ${sortedBAM}BD143_TGACCA_L00*.sorted.bam
 
 
 
