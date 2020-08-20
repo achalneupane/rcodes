@@ -1,0 +1,398 @@
+---
+title: "Temporal Correlations"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(ggformula)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+# Introduction
+
+Yield monitor data is commonly analyzes as geospatial data, and one common assumption of spatial correlation is that the correlation structure is isotropic. However, by it's nature, we should expect yield data to be anisotropic - the path of the combine in space and the movement of the grain through the combine over time add a correlation structure that is independent of the spatial correlation among plants in the field.
+
+How much does ignoring this correlation affect estimation and inference of yield data.
+
+## Example
+
+```{r}
+columns <-c("Group.1","X","Y","VRYIELDVOL","DISTANCE","WetMass","Moisture")
+
+harvest.dat <- read.csv('./yield/Home Corn 2018.csv')[,columns]
+harvest.dat$VRYIELDVOLRank <- rank(harvest.dat$VRYIELDVOL)
+harvest.dat$VRYIELDVOLRank <- harvest.dat$VRYIELDVOLRank/max(harvest.dat$VRYIELDVOLRank)
+harvest.dat$Field <- 'Home Corn 2018'
+```
+
+```{r,fig.width=8,fig.height=8}
+library(ggplot2)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+ggplot(harvest.dat, aes(X,Y)) + 
+geom_point(aes(colour = VRYIELDVOLRank),size=1) + 
+scale_colour_gradient(low=cbPalette[5], high=cbPalette[6]) +
+labs(colour = "Yield (Rank)", x="X (m)", y="Y (m)", title = "Yield Maps")
+```
+
+
+
+```{r,fig.width=8,fig.height=8}
+ggplot(harvest.dat, aes(X,Y)) + 
+geom_point(aes(colour = VRYIELDVOL),size=1) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(colour = "Yield", x="X (m)", y="Y (m)", title = "Yield Maps")
+```
+
+```{r}
+#2016
+#harvest.dat$Time <- as.POSIXct(as.character(harvest.dat$Group.1),format="%m/%d/%Y %H:%M:%OS")
+#2018
+#2018-11-02T15:01:20.000Z
+harvest.dat$Time <- as.POSIXct(as.character(harvest.dat$Group.1),format="%Y-%m-%dT%H:%M:%OSZ")
+harvest.dat$ID <- 1:dim(harvest.dat)[1]
+```
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat, aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[5], high=cbPalette[6]) +
+geom_point(aes(color=X), size=1) + geom_smooth(se=FALSE)
+```
+
+```{r}
+harvest.dat$VRYIELDVOLZ <- (harvest.dat$VRYIELDVOL - mean(harvest.dat$VRYIELDVOL,na.rm=TRUE))/sd(harvest.dat$VRYIELDVOL,na.rm=TRUE)
+harvest.dat <- harvest.dat[abs(harvest.dat$VRYIELDVOLZ)<4,]
+```
+
+
+```{r,fig.width=8,fig.height=8}
+ggplot(harvest.dat, aes(X,Y)) + 
+geom_point(aes(colour = VRYIELDVOL),size=1) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(colour = "Yield", x="X (m)", y="Y (m)", title = "Yield Maps")
+```
+
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat, aes(Time,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[5], high=cbPalette[6]) +
+geom_point(aes(color=Y), size=1) + geom_smooth(se=FALSE)
+```
+
+
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat, aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[5], high=cbPalette[6]) +
+geom_point(aes(color=X), size=1) + geom_smooth(se=FALSE)
+```
+
+```{r}
+add.metric <- function(data, origin=c(-1,-1)) {
+  if(any(origin<0)) {
+    origin[1] <- min(data$X)
+    origin[2] <- min(data$Y)
+  }
+  data$LonM <- data$X - origin[1]
+  data$LatM <- data$Y - origin[2]
+  latMid <- (min(data$Y) + max(data$Y))/2
+  m_per_deg_lat = 111132.954 - 559.822 * cos( 2.0 * latMid ) + 1.175 * cos( 4.0 * latMid)
+  m_per_deg_lon = (3.14159265359/180 ) * 6367449 * cos ( latMid )
+  data$LonM <- data$LonM*m_per_deg_lon
+  data$LatM <- data$LatM*m_per_deg_lat
+  return(data)
+}
+
+harvest.dat <- add.metric(harvest.dat)
+```
+
+```{r}
+metric.col <- c(which(names(harvest.dat)=="LatM"), which(names(harvest.dat)=="LonM"))
+coords.col <- c(which(names(harvest.dat)=="Y"), which(names(harvest.dat)=="X"))
+#harvest.gdat <- as.geodata(harvest.dat, coords.col = metric.col, data.col = data.col)
+```
+
+```{r,fig.width=8,fig.height=6,eval=FALSE}
+library(geoR)
+Yield.idx = which(names(harvest.dat)=="VRYIELDVOL")
+Yield.gdat <- as.geodata(harvest.dat, coords.col = metric.col, data.col = Yield.idx)
+Yield.var4 <- variog4(Yield.gdat,max.dist=200)
+plot(Yield.var4, omnidirectional=TRUE)
+```
+
+```{r}
+library(gstat)
+Yield.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(Yield.var)
+```
+
+
+```{r}
+ggplot(harvest.dat, aes(X,Y)) + 
+geom_point(aes(colour = Y),size=1) + 
+scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+labs(colour = "Northing", x="X (m)", y="Y (m)", title = "Yield Maps")
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat, aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_smooth(se=FALSE)
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat, aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=X), size=1) + geom_smooth(se=FALSE)
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <11000,], aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = ID, y = VRYIELDVOL), nknots = 10)
+```
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <11000,], aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = ID, y = VRYIELDVOL), nknots = 20)
+```
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <11000,], aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = ID, y = VRYIELDVOL), nknots = 30)
+```
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <10100,], aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = ID, y = VRYIELDVOL), nknots = 10)
+```
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <10100,], aes(ID,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = ID, y = VRYIELDVOL), nknots = 20)
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <10100,], aes(ID,Moisture)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = ID, y = Moisture), nknots = 10)
+```
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$Moisture >5,], aes(Moisture,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = Moisture, y = VRYIELDVOL), nknots = 10)
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$Moisture >5,], aes(WetMass,VRYIELDVOL)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1)
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <10100,], aes(ID,WetMass)) + scale_colour_gradient(low=cbPalette[1], high=cbPalette[2]) +
+geom_point(aes(color=Y), size=1) + geom_spline(aes(x = ID, y = WetMass), nknots = 20)
+```
+
+
+# Smoothing
+
+```{r}
+
+rng=40
+harvest.var <- variogram(VRYIELDVOL~1, locations=~X+Y, 
+   data=harvest.dat)
+sph.vgm <- fit.variogram(harvest.var, vgm("Sph"))
+sph.vgm
+plot(gamma ~ dist, data=harvest.var,ylim=c(0,max(harvest.var$gamma)),col="blue")
+abline(v=rng)
+```
+
+```{r}
+harvest.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(harvest.var)
+```
+
+```{r}
+harvest.spline <- smooth.spline(y=harvest.dat$VRYIELDVOL,x = harvest.dat$ID)
+harvest.dat$spline <- predict(harvest.spline)$y
+str(harvest.spline)
+
+harvest.spline100 <- smooth.spline(y=harvest.dat$VRYIELDVOL,x = harvest.dat$ID,df=100)
+#harvest.spline100 <- smooth.spline(y=harvest.dat$VRYIELDVOL,x = harvest.dat$ID,tol = 1e-3)
+harvest.dat$spline100 <- predict(harvest.spline100)$y
+
+harvest.spline1000 <- smooth.spline(y=harvest.dat$VRYIELDVOL,x = harvest.dat$ID,df=1000)
+#harvest.spline1000 <- smooth.spline(y=harvest.dat$VRYIELDVOL,x = harvest.dat$ID,tol = 1e-8)
+harvest.dat$spline1000 <- predict(harvest.spline1000)$y
+
+
+harvest.dat$loess100 <- predict(loess(VRYIELDVOL~ID, harvest.dat, span = 0.01))
+harvest.dat$loess500 <- predict(loess(VRYIELDVOL~ID, harvest.dat, span = 0.002))
+harvest.dat$loess1000 <- predict(loess(VRYIELDVOL~ID, harvest.dat, span = 0.001))
+```
+
+
+
+
+```{r}
+spline.var <- variogram(spline~1, locations=~X+Y, 
+   data=harvest.dat)
+spline.vgm <- fit.variogram(spline.var, vgm("Sph"))
+spline.vgm
+plot(spline.var)
+#plot(gamma ~ dist, data=spline.var,ylim=c(0,max(spline.var$gamma)),col="blue")
+```
+
+```{r}
+spline.var <- variogram(spline~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(spline.var)
+```
+
+
+```{r}
+spline100.var <- variogram(spline100~1, locations=~X+Y, 
+   data=harvest.dat)
+spline100.vgm <- fit.variogram(spline100.var, vgm("Sph"))
+spline100.vgm
+#plot(gamma ~ dist, data=spline100.var,ylim=c(0,max(spline100.var$gamma)),col="blue")
+plot(spline100.var)
+```
+
+```{r}
+spline100.var <- variogram(spline100~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(spline100.var)
+```
+
+```{r}
+spline1000.var <- variogram(spline1000~1, locations=~X+Y, 
+   data=harvest.dat)
+spline1000.vgm <- fit.variogram(spline1000.var, vgm("Sph"))
+spline1000.vgm 
+plot(gamma ~ dist, data=spline1000.var,ylim=c(0,max(spline1000.var$gamma)),col="blue")
+```
+
+```{r}
+spline1000.var <- variogram(spline1000~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(spline1000.var)
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat, aes(ID,VRYIELDVOL)) + geom_point(size=.5,color=cbPalette[1]) + geom_line(aes(ID,spline),color=cbPalette[2]) +
+  geom_line(aes(ID,spline100),color=cbPalette[3]) +
+    geom_line(aes(ID,spline1000),color=cbPalette[4])
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(harvest.dat, aes(ID,VRYIELDVOL)) + geom_point(size=.5,color=cbPalette[1]) + geom_line(aes(ID,loess100),color=cbPalette[2]) +
+  geom_line(aes(ID,loess500),color=cbPalette[3]) +
+  geom_line(aes(ID,loess1000),color=cbPalette[4])
+```
+
+
+```{r,fig.width=8,fig.height=5}
+sub.dat <- harvest.dat[harvest.dat$ID >10000 & harvest.dat$ID <10100,]
+ggplot(sub.dat, aes(ID,VRYIELDVOL)) + geom_point(size=1,color=cbPalette[1]) + geom_line(aes(ID,spline),color=cbPalette[2]) +
+  geom_line(aes(ID,spline100),color=cbPalette[3]) +
+    geom_line(aes(ID,spline1000),color=cbPalette[4])
+```
+
+
+```{r,fig.width=8,fig.height=5}
+ggplot(sub.dat, aes(ID,VRYIELDVOL)) + geom_point(size=1,color=cbPalette[1]) + geom_line(aes(ID,loess100),color=cbPalette[2]) +
+  geom_line(aes(ID,loess500),color=cbPalette[3]) +
+  geom_line(aes(ID,loess1000),color=cbPalette[4])
+```
+
+
+
+```{r}
+loess100.var <- variogram(loess100~1, locations=~X+Y, 
+   data=harvest.dat)
+loess100.vgm <- fit.variogram(loess100.var, vgm("Sph"))
+loess100.vgm
+plot(gamma ~ dist, data=loess100.var,ylim=c(0,max(loess100.var$gamma)),col="blue")
+```
+
+```{r}
+loess100.var <- variogram(loess100~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(loess100.var)
+```
+
+```{r}
+loess500.var <- variogram(loess500~1, locations=~X+Y, 
+   data=harvest.dat)
+loess500.vgm <- fit.variogram(loess500.var, vgm("Sph"))
+loess500.vgm
+plot(gamma ~ dist, data=loess500.var,ylim=c(0,max(loess500.var$gamma)),col="blue")
+```
+
+```{r}
+loess500.var <- variogram(loess500~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(loess500.var)
+```
+
+
+```{r}
+loess1000.var <- variogram(loess1000~1, locations=~X+Y, 
+   data=harvest.dat)
+loess1000.vgm <- fit.variogram(loess1000.var, vgm("Sph"))
+loess1000.vgm 
+plot(gamma ~ dist, data=loess1000.var,ylim=c(0,max(loess1000.var$gamma)),col="blue")
+```
+
+```{r}
+loess1000.var <- variogram(loess1000~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,30,60,90), 
+                          data=harvest.dat)
+plot(loess1000.var)
+```
+
+
+```{r,fig.width=12,fig.height=12}
+comb.dat <- rbind(harvest.dat[,c('X','Y')],harvest.dat[,c('X','Y')],harvest.dat[,c('X','Y')],harvest.dat[,c('X','Y')])
+comb.dat$Yield <-c(harvest.dat$VRYIELDVOL,harvest.dat$loess100,harvest.dat$loess500,harvest.dat$loess1000)
+comb.dat$Smooth <- c(rep('none',length(harvest.dat$VRYIELDVOL)),rep('loess100',length(harvest.dat$loess100)), rep('loess500',length(harvest.dat$loess500)), rep('loess1000',length(harvest.dat$loess1000)))
+ggplot(comb.dat, aes(X,Y)) + 
+geom_point(aes(colour = Yield),size=.5) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(x="X (m)", y="Y (m)", title = "Yield Maps") + facet_wrap(~ Smooth,ncol=2)
+```
+
+```{r,fig.width=12,fig.height=12}
+comb.dat$YieldRank <-c(rank(harvest.dat$VRYIELDVOL),rank(harvest.dat$loess100),rank(harvest.dat$loess500),rank(harvest.dat$loess1000))
+ggplot(comb.dat, aes(X,Y)) + 
+geom_point(aes(colour = YieldRank),size=.5) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(x="X (m)", y="Y (m)", title = "Yield (Rank) Maps") + facet_wrap(~ Smooth,ncol=2)
+```
+
+
+

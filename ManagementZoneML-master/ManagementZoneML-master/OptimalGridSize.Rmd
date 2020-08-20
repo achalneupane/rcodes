@@ -1,0 +1,445 @@
+---
+title: "Optimal Grid Size"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+
+# Introduction
+
+
+Variable-rate technology in precision agriculture allows the rate of agronomic products to be determined by the exact location in cropland. VRT is in contrast to uniform rate application where a single rate is applied to each cropland, though different croplands may receive different rates. One common practice using VRT is map-based prescriptions, where various map-based (GIS) data layers are used to predetermine rates to applied at various map units. 
+
+Prescription maps may be derived from past history. Yield maps from previous harvests are taken to be representative of the innate fertility in cropland. However, yield data samples can be highly variable from point to point and yield values are rarely sampled at the same GPS coordinates from season to season. Thus, croplands will be divided into discrete management zones. There is, at this point, no common guidelines for determining the size or dimensions of these grid cells.
+
+Suppose we have identified an optimal grid cell dimension and have written a prescription map for some agronomic practice, say, for example, seeding rate. How do we determine the effectiveness of the prescriptions? One common practice is to introduce *Learning Blocks*, for example, see [PremiereCrop](https://www.premiercrop.com/onfarmtrials_elbs/), [NextLevelAg](https://www.nextlevelag.com/mapping-center), [AYS](https://agpartners.net/wp-content/uploads/2014/08/AYSBrochure1.pdf) or [HarvestMax](https://www.harvest-max.com/consulting) or *Test Blocks*, for example, [LGSeeds](https://www.lgseeds.com/agronomy/corn/agronomy-blog/2019/03/29/advantage-acre-test-blocks)). These blocks are used to observational purposes and the statistical properties of design of such learning blocks has been poorly investigated. Here, we consider using historical yield maps to choose grid cell size and dimensions and to guide decisions about the number of grid cells to include in a prescription map.
+
+## Power calculations and required replicates.
+
+Suppose we wish to compare two means using a simple $t$-test. We write
+
+$$
+t = \frac{|m_1 - m_2|}{s\sqrt{2/n}}
+$$
+where $m_1$ and $m_2$ are mean estimates. For simplicity, we assume a pooled standard deviation $s$ and that each mean has the same number of observations $n$. We may declare the difference $\delta = |m_1 - m_2|$ statistical significant if it is greater than some critical $t$ value
+
+$$
+\frac{\delta}{s\sqrt{2/n}} \ge t_{\alpha/2}
+$$
+where $\alpha$ is the desired significance level, usually $0.05$
+
+We can rearrange this to isolate $n$ by writing
+
+$$
+n \ge 2 \times \left(\frac{s}{\delta}\right)^2  t_{\alpha/2}^2
+$$
+We typically control for Type II error and try to achieve a statistical power of $1-\beta$. This will require a corresponding increase in the number of replicates, given by
+
+$$
+n \ge 2 \times \left(\frac{s}{\delta}\right)^2  \left(t_{\alpha/2} + t_{\beta}\right)^2
+$$
+$t$ will depend on the degrees of freedom of $s$, so for simplicity we might replace $t$ with quantiles from the $z$ distribution. When planning, we may not know the exact values for means and standard deviations, so it is common to express $s$ and $\delta$ as percentages, so we write
+
+$$
+n \ge 2 \times \left(\frac{CV}{\%Diff}\right)^2  \left(t_{\alpha/2} + t_{\beta}\right)^2
+$$
+where, in the case of two means, the coefficient of variance $CV = 100\times \frac{s}{(m_1+m_2)/2}$ and $\%Diff= 100\times \frac{\delta}{(m_1+m_2)/2}$.
+
+We write this as an R function
+
+```{r}
+required.replicates <- function(Diff,CV,alpha=0.05,beta=0.20) {
+  d <- CV/Diff
+  ceiling(2*d^2*(qnorm(1-beta) + qnorm(1-alpha/2))^2)
+}
+```
+
+
+# Data
+
+We will use previously processed yield data (see `ProcessFiles.Rmd` and `CombiningMultipleYears.Rmd`). These data, comprising 5 years of harvest data from a single cropland over the period from 2013 to 2018 (excepting 2014), are saved in an R data file. We will be using `Yield` estimates in $bushels/acre$ and the associated spatial coordinates `Longitude` and `Latitude` in meters from the origin at the lower left corner of the cropland.
+
+```{r}
+load('home.squares.Rda')
+```
+
+We will start our analysis with the 2015 data. First, we can visualize this data set by first plotting points by longitude and latitude.
+
+```{r}
+plot(Latitude ~ Longitude, data=home.2015.dat,pch='.')
+```
+
+# Assigning Grid Cells
+
+It has been common practice when developing cropland management zones to create a common coordinate system that allow yield data from different growing seasons to be combined into a single standardized data set. This process usually involves assigning a system of grid cells to yield maps and to calculate the average of the yield samples that fall within a grid cell. (see https://openprairie.sdstate.edu/plant_faculty_pubs/148/ or https://www.sbreb.org/wp-content/uploads/2018/05/Yield-Mapping.pdf).
+
+
+For example, we might divide a cropland into four quadrants. This requires determining a mid-point for latitude and a mid-point for longitude. We are working with yield maps where the GPS coordinates have been converted to metric distance from a common origin, so for these data we can assume the lower left corner of the cropland is at $\{0,0\}$. 
+
+For simplicity, we'll trim the data to lie within 400m latitude and 600 longitude of the origin.
+
+```{r}
+home.2015.dat <- home.2015.dat[home.2015.dat$Latitude<=400,]
+home.2015.dat <- home.2015.dat[home.2015.dat$Longitude<=600,]
+```
+
+We can determine row and column numbers, for a grid with 2 rows and 2 columns, by
+
+```{r}
+#define a range in case we have different field dimensions
+#although, to be completely generic, we should also account
+#for the lower bounds as well
+latRange <- 400
+lonRange <- 600
+home.2015.dat$Row <- ceiling(2*home.2015.dat$Latitude/latRange)
+home.2015.dat$Col <- ceiling(2*home.2015.dat$Longitude/lonRange)
+```
+
+We use a common mapping idiom and create unique cell identifiers by multiplying row by 1000 and adding column. This provides a numeric value that retains some row-column information.
+
+```{r}
+home.2015.dat$Cell <- 1000*home.2015.dat$Row + home.2015.dat$Col
+```
+
+We visualize this by assigning colors for each unique grid cell number.
+
+```{r}
+grid.colors <- cbPalette[1:4]
+names(grid.colors) <- unique(home.2015.dat$Cell)
+plot(Latitude ~ Longitude, data=home.2015.dat,col=grid.colors[as.character(home.2015.dat$Cell)])
+```
+
+## Power Calculations
+
+Suppose we use these four quadrants to define a learning block (or some other similar on-farm experiment). What is the expected variance, if we assume similar spatial variation in yield over a future growing season for this cropland? 
+
+We calculate an average for each quadrant (or grid cell) and call this the yield estimate for each grid cell for 2015; we may denote this as, e.g., $Y_{1001,2015}$
+
+```{r}
+print(means4 <- tapply(home.2015.dat$Yield,home.2015.dat$Cell,mean))
+```
+
+We compute a coefficient of variation from the grand mean (the mean of the grid cells) and the pooled standard deviation $s$ of the grid cells; this generalizes the formula $CV = \frac{s}{(m_1 + m_2)/2} to an arbitrary number of means.
+
+```{r}
+print(m4 <- mean(means4))
+print(sd4 <- sd(means4))
+print(CV <- 100*sd4/m4)
+```
+
+Suppose we test a higher seeding rate to a standard (control) seeding rate. We hope to use the $t$-test to compare yields between the higher rate and control rate cells; how many grid cells would be required to detect a 10% difference between the two practices? We calculate using our previously defined function:
+
+```{r}
+required.replicates(Diff=10,CV=CV)
+```
+
+# Subdivisions
+
+Clearly, we will need to further divide the field into more grid cells. Based on this CV, we will need at least 24 cells (2 treatments replicated 14 times each). Will CV remain constant as we divide the grid? To explore this, we'll iterate over increasing subdivisions. That is, we will create $\{2,4,...\}$ rows and a similar number of columns. At each step, we will calculate CV and required replicates as above.
+
+As we iterate, we'll also want to keep track of the sample size per grid cell, specifically the minimum number of samples. We would like to have 30 or so samples per cell
+
+```{r}
+rows <- 6
+GridSummary <- data.frame(Divisions=1:rows)
+GridSummary$MinSamples=NA #Minimum number of samples
+GridSummary$Cells=NA      #total number of cells
+GridSummary$Mean=NA       #mean of grid cell estimates
+GridSummary$SD=NA         #standard deviation of grid cell estimates
+
+for (i in 1:length(GridSummary$Divisions)) {
+  #dividing by range normalizes the coordinates to 0-1; convert this
+  #to an integer index by multiplying by the expected number of rows or
+  #columns.
+  div <- 2^i
+  home.2015.dat$Row <- ceiling(div*home.2015.dat$Latitude/latRange)
+  home.2015.dat$Col <- ceiling(div*home.2015.dat$Longitude/lonRange)
+  home.2015.dat$Cell <-home.2015.dat$Row*1000 + home.2015.dat$Col
+
+  #number of samples per grid cell (assuming no NA values)
+  samples <- tapply(home.2015.dat$Cell,home.2015.dat$Cell,length)
+  #grid cell yield estimates
+  yields <- tapply(home.2015.dat$Yield,home.2015.dat$Cell,mean)
+  
+  GridSummary$MinSamples[i] <- min(samples)
+  GridSummary$Cells[i] <- length(yields)
+  GridSummary$Mean[i] <- mean(yields)
+  GridSummary$SD[i] <- sd(yields)
+}
+```
+
+Now consider how CV changes with the number of cells.
+
+```{r}
+GridSummary$CV <- 100*GridSummary$SD/GridSummary$Mean
+plot(CV ~ Cells, data=GridSummary)
+```
+
+CV increases rapidly with grid cell number until about 250 grid cells, where the relative increase in CV slows. We can consider that as we increase cell number, we partition total variability in data from sampling or measurement error (within cell variance) to observational unit area (between cell variance). 
+
+For the purposes of variable rate management, we can to capture as much of the variance between cells as possible (to allow for more precise prescriptions for variable rates) while allowing for accurate measurements of yield within cells. At first glance, then, ~250 cells might be optimal.
+
+We consider the summary table.
+
+```{r}
+GridSummary
+```
+
+We have a minimum of 30 samples at 256 grid cells, so we would prefer no more than 256 cells. 
+
+Now consider the sampling pattern. We assign 256 grid cells.
+
+```{r}
+home.2015.dat$Row <- ceiling((2^4)*home.2015.dat$Latitude/latRange)
+home.2015.dat$Col <- ceiling((2^4)*home.2015.dat$Longitude/lonRange)
+home.2015.dat$Cell <-home.2015.dat$Row*1000 + home.2015.dat$Col
+```
+
+and plot the sample points, coloring by cells.
+
+```{r}
+#assign a variable to create a checkerboard
+home.2015.dat$Check <- (home.2015.dat$Row+home.2015.dat$Col) %% 2 + 1
+grid.colors <- cbPalette[1:2]
+plot(Latitude ~ Longitude, data=home.2015.dat,col=grid.colors[home.2015.dat$Check])
+```
+
+We also consider a smaller sampling region
+
+```{r}
+grid.colors <- cbPalette[1:6]
+sub.dat <- home.2015.dat[home.2015.dat$Row<=2 & home.2015.dat$Col <= 3, ]
+names(grid.colors) <- unique(sub.dat$Cell)
+plot(Latitude ~ Longitude, data=sub.dat, col=grid.colors[sub.dat$Check])
+```
+
+We note now that the sampling pattern is not uniform in rows and columns. This we can expect to be typical for yield monitor data. When harvesting, yield is collected from an area defined by the width of the combine header and by the distance traveled between samples. From these data, this is a very wide but shallow rectangle. Thus, our grid cells should have similar ratios of width to length.
+
+With the current cell width, we should assume significant overlap; in the previous graph, we see the first column is 3 samples wide, while the next column is 2 samples wide. We can assume, than, that part of the region that falls in column 2 is being associated with column 1 - that is, each grid column is 2.5 harvester widths. This will lead to some degree of measurement error if we simply calculate arithmetic means of the cells that fall within a grid cell.
+
+Upon further inspection, it appears that 100m falls in the midpoint between sample columns; thus, we should prefer grids at 100m increments for these data. This determines our choice of the number of columns for an optimal grid for these data.
+
+# Row Dimensions
+
+We repeat much of the code from the previous section. We will iterate starting with 6 rows and 6 columns, but hold columns constant as we increase the number of rows. We'll require at least 10 meters per row.
+
+```{r}
+rows <- 40
+GridSummary <- data.frame(Rows=6:rows)
+GridSummary$MinSamples=NA #Minimum number of samples
+GridSummary$Cells=NA      #total number of cells
+GridSummary$Mean=NA       #mean of grid cell estimates
+GridSummary$SD=NA         #standard deviation of grid cell estimates
+
+for (i in 1:length(GridSummary$Rows)) {
+  home.2015.dat$Row <- ceiling(GridSummary$Rows[i]*home.2015.dat$Latitude/latRange)
+  home.2015.dat$Col <- ceiling(6*home.2015.dat$Longitude/lonRange)
+  home.2015.dat$Cell <-home.2015.dat$Row*1000 + home.2015.dat$Col
+
+  #number of samples per grid cell (assuming no NA values)
+  samples <- tapply(home.2015.dat$Cell,home.2015.dat$Cell,length)
+  #grid cell yield estimates
+  yields <- tapply(home.2015.dat$Yield,home.2015.dat$Cell,mean)
+  
+  GridSummary$MinSamples[i] <- min(samples)
+  GridSummary$Cells[i] <- length(yields)
+  GridSummary$Mean[i] <- mean(yields)
+  GridSummary$SD[i] <- sd(yields)
+}
+```
+
+```{r}
+GridSummary$CV <- 100*GridSummary$SD/GridSummary$Mean
+plot(CV ~ Cells, data=GridSummary)
+```
+
+CV increases from ~16.5 to ~18 up to 100 cells, then increases from ~18 to ~19 as cells increase from 100-200. This suggests that ~100 cells is a good choice for these data. Since these data are in a range over 400m, 20 rows seems reasonable; this gives use a round number (20m) for grid length. We also consider the 
+
+```{r}
+GridSummary[GridSummary$Rows %in% c(10,20,40),]
+```
+
+
+We examine the sampling pattern with 20 rows:
+
+```{r}
+home.2015.dat$Row <- ceiling(20*home.2015.dat$Latitude/latRange)
+home.2015.dat$Col <- ceiling(6*home.2015.dat$Longitude/lonRange)
+home.2015.dat$Cell <-home.2015.dat$Row*1000 + home.2015.dat$Col
+
+#assign a variable to create a checkerboard
+home.2015.dat$Check <- (home.2015.dat$Row+home.2015.dat$Col) %% 2 + 1
+grid.colors <- cbPalette[1:2]
+plot(Latitude ~ Longitude, data=home.2015.dat,col=grid.colors[home.2015.dat$Check])
+```
+
+We note that with 100m column width, we have 7 sample columns per grid cell column.
+
+```{r}
+grid.colors <- cbPalette[1:6]
+sub.dat <- home.2015.dat[home.2015.dat$Row<=2 & home.2015.dat$Col <= 3, ]
+names(grid.colors) <- unique(sub.dat$Cell)
+plot(Latitude ~ Longitude, data=sub.dat, col=grid.colors[as.character(sub.dat$Cell)])
+```
+
+# Grid dimensions over years
+
+Before we make a final decision on appropriate grid dimensions for these data, we will iterate over the five data sets for this cropland. We'll use lists for this.
+
+```{r}
+fields <- vector(5, mode='list')
+years <- c(2013, 2015, 2016, 2017, 2018)
+fields[[1]] <- home.2013.dat
+fields[[2]] <- home.2015.dat
+fields[[3]] <- home.2016.dat
+fields[[4]] <- home.2017.dat
+fields[[5]] <- home.2018.dat
+
+# trim data
+for(i in 1:length(fields)) {
+  fields[[i]] <- fields[[i]][fields[[i]]$Latitude<=400,]
+  fields[[i]] <- fields[[i]][fields[[i]]$Longitude<=600,]
+}
+```
+
+Define a one-shot utility function to help iterate over these croplands. We'll define default values for this set of data; perhaps we'll reuse this for other data sets.
+
+```{r}
+sample.over.rows <- function(harvest.dat,range=c(6,40),columns=6,latRange=400,lonRange=600) {
+  rows <- 40
+  GridSummary <- data.frame(Rows=6:rows)
+  GridSummary$MinSamples=NA #Minimum number of samples
+  GridSummary$Cells=NA      #total number of cells
+  GridSummary$Mean=NA       #mean of grid cell estimates
+  GridSummary$SD=NA         #standard deviation of grid cell estimates
+
+  for (i in 1:length(GridSummary$Rows)) {
+    harvest.dat$Row <- ceiling(GridSummary$Rows[i]*harvest.dat$Latitude/latRange)
+    harvest.dat$Col <- ceiling(6*harvest.dat$Longitude/lonRange)
+    harvest.dat$Cell <-harvest.dat$Row*1000 + harvest.dat$Col
+
+    #number of samples per grid cell (assuming no NA values)
+    samples <- tapply(harvest.dat$Cell,harvest.dat$Cell,length)
+    #grid cell yield estimates
+    yields <- tapply(harvest.dat$Yield,harvest.dat$Cell,mean)
+  
+    GridSummary$MinSamples[i] <- min(samples)
+    GridSummary$Cells[i] <- length(yields)
+    GridSummary$Mean[i] <- mean(yields)
+    GridSummary$SD[i] <- sd(yields)
+  }
+  return(GridSummary)
+}
+```
+
+and create summary tables for each yield; we'll plot CV at each iteration.
+
+```{r}
+#join individual summaries for each year
+GridSummaries <- NULL
+par(mfrow=c(2,3))
+for(i in 1:length(fields)) {
+  CurrentSummary <- sample.over.rows(fields[[i]])
+  CurrentSummary$Year <- years[i]
+  CurrentSummary$CV <- 100*CurrentSummary$SD/CurrentSummary$Mean
+  
+  plot(CV ~ Cells,data=CurrentSummary, main = paste('CV for',years[i]),col=cbPalette[1])
+  #highlight CV at select row numbers
+  points(CV ~ Cells,data=CurrentSummary[CurrentSummary$Rows %in% c(10,20,40),], 
+         col=cbPalette[2],
+         pch=16)
+  GridSummaries <- rbind(GridSummaries,CurrentSummary)
+}
+```
+
+and examine the summaries
+
+```{r}
+grid.colors <- cbPalette[1:5]
+names(grid.colors) <- years
+plot(CV ~ Cells, data=GridSummaries,col=grid.colors[as.character(GridSummaries$Year)])
+points(CV ~ Cells,data=GridSummaries[GridSummaries$Rows %in% c(10,20,40),], 
+       col=cbPalette[8],
+       pch=16)
+```
+
+
+# Required Replicates
+
+We now move to power calculations. We first calculate required replicates for at 2.5%, 5% and 10% expected treatment difference. We plot a summary combining fields, highlighting select row numbers.
+
+```{r,fig.width=9,fig.height=4}
+par(mfrow=c(1,3))
+GridSummaries$RR2.5 <- required.replicates(2.5,GridSummaries$CV)
+GridSummaries$RR5 <- required.replicates(5,GridSummaries$CV)
+GridSummaries$RR10 <- required.replicates(10,GridSummaries$CV)
+grid.colors <- cbPalette[1:5]
+names(grid.colors) <- years
+plot(RR2.5 ~ Cells, data=GridSummaries,col=grid.colors[as.character(GridSummaries$Year)],
+     ylab='Required Replicates, 2.5% Difference')
+abline(0,.5)
+points(RR2.5 ~ Cells,data=GridSummaries[GridSummaries$Rows %in% c(10,20,40),], 
+       col=cbPalette[8],
+       pch=16)
+plot(RR5 ~ Cells, data=GridSummaries,col=grid.colors[as.character(GridSummaries$Year)],
+     ylab='Required Replicates, 5% Difference')
+abline(0,.5)
+points(RR5 ~ Cells,data=GridSummaries[GridSummaries$Rows %in% c(10,20,40),], 
+       col=cbPalette[8],
+       pch=16)
+plot(RR10 ~ Cells, data=GridSummaries,col=grid.colors[as.character(GridSummaries$Year)],
+     ylab='Required Replicates, 10% Difference')
+abline(0,.5)
+points(RR10 ~ Cells,data=GridSummaries[GridSummaries$Rows %in% c(10,20,40),], 
+       col=cbPalette[8],
+       pch=16)
+```
+
+These plots include a reference line were required replicates is twice the number of grid cells; if we assume two treatments, we will have enough grid cells for any combination of year and cell number lying to the right of the line.
+
+It will be extremely unlikely we would be able to detect a 2.5% with fewer than 40 rows, and that when yield is unusually stable throughout the cropland, while, in contrast, 20 rows will be sufficient to detect a 10% difference when yield variability is comparable the the five years examined.
+
+At this point, 20 rows appears to be an acceptable compromise; this will give use enough cells to have a reasonable chance of detecting a 5% or greater difference, but will give us sufficient sample size per grid. 
+
+# 6 x 20 Grid dimensions
+
+We now examine the sampling patterns as previous, first over the full field, and then with six corner grid cells.
+
+```{r,fig.width=9,fig.height=6}
+par(mfrow=c(2,3))
+grid.colors <- cbPalette[1:2]
+for(i in 1:length(fields)) {
+  CurrentSummary <- sample.over.rows(fields[[i]])
+  fields[[i]]$Row <- ceiling(20*fields[[i]]$Latitude/latRange)
+  fields[[i]]$Col <- ceiling(6*fields[[i]]$Longitude/lonRange)
+  fields[[i]]$Cell <-fields[[i]]$Row*1000 + fields[[i]]$Col
+  fields[[i]]$Check <- (fields[[i]]$Row+fields[[i]]$Col) %% 2 + 1
+  plot(Latitude ~ Longitude, data=fields[[i]],col=grid.colors[fields[[i]]$Check],
+       pch='.', main=paste('Grid',years[i]))
+}
+```
+
+```{r,fig.width=9,fig.height=6}
+grid.colors <- cbPalette[1:6]
+par(mfrow=c(2,3))
+for(i in 1:length(fields)) {
+  sub.dat <- fields[[i]][fields[[i]]$Row<=2 & fields[[i]]$Col <= 3, ]
+  names(grid.colors) <- unique(sub.dat$Cell)
+  plot(Latitude ~ Longitude, data=sub.dat, col=grid.colors[as.character(sub.dat$Cell)],
+       main=paste('Grid',years[i]))
+}
+```
+
+Given these harvest patterns in these data, grids will cells 100m wide and 20m long will be optimal. Note that in 2016 and 2018 our grid width covers 8 harvest passes; the equipment used for spraying typically cover 4 harvest passes, so this cell width will be convenient for many applications.
+
+
+# Further analysis
+
+At this point, our analysis as been largely ad-hoc and based on inspection of simple summary analysis. We can be more rigorous; for example, consider [A First Course in Biometry for Agriculture Students](https://books.google.com/books/about/A_first_course_in_biometry_for_agricultu.html), A.A. Rayner, Chapter 25 (Sampling of Experimental Plots) 

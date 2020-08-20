@@ -1,0 +1,117 @@
+---
+title: "Overview"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+# Introduction
+
+Identifying management zones in agricultural land is a relatively new problem in precision agriculture. The promise of precision ag is to allow management decisions to be made at a a very fine scale, reducing cost (and waste) while improving yields, relative to managment decisions made at a whole field level. However, this can be data intensive, and there is still much work to be done from the data science perspective.
+
+Consider the relatively simple problem of categorizing regions in a field as high, medium or low yield zones. A high yielding zone may, for example, support higher plant densities and higher seeding rates than low yielding zones. The precision of zone assignment thus must be on a scale not much finer than the dimensions of a seeder.
+
+Most commonly, yield potential in a given field is assessed by summarizing yield monitor data from previous harvests; these data are commonly sampled on sales of the order of 5m. Zones have previously been identified by pooling samples over 10-30m grid cells.
+
+Suppose we are able to aggregate yield data over a 10m grid, and assign each cell to a management zone. It may not be practical to manage an entire field with management zones scattered haphazardly througout the field; instead, we may wish to aggregate individual cells into an optimal number of contiguous management zones,
+
+For example, consider a problem of a field with naturally occuring low-yield regions - minor depressions or salt seeps that are have highly variable yield, or consistently yield less than a break-even harvest. Can we use machine learning or clustering algorithms to identify contiguous low-yield zones that can be taken out of production and restored to native conditions?
+
+## Example
+
+```{r}
+columns <-c("Group.1","X","Y","VRYIELDVOL","DISTANCE","WetMass","Moisture")
+tmp.dat <- read.csv('./yield/Home Soybeans 2013.csv')[,columns]
+tmp.dat$VRYIELDVOLRank <- rank(tmp.dat$VRYIELDVOL)
+tmp.dat$VRYIELDVOLRank <- tmp.dat$VRYIELDVOLRank/max(tmp.dat$VRYIELDVOLRank)
+tmp.dat$Field <- 'Home Soybeans 2013'
+harvest.dat <- tmp.dat
+
+tmp.dat <- read.csv('./yield/Home Wheat 2015.csv')[,columns]
+tmp.dat$VRYIELDVOLRank <- rank(tmp.dat$VRYIELDVOL)
+tmp.dat$VRYIELDVOLRank <- tmp.dat$VRYIELDVOLRank/max(tmp.dat$VRYIELDVOLRank)
+tmp.dat$Field <- 'Home Wheat 2015'
+harvest.dat <- rbind(harvest.dat,tmp.dat)
+
+tmp.dat <- read.csv('./yield/Home Corn 2016.csv')[,columns]
+tmp.dat$VRYIELDVOLRank <- rank(tmp.dat$VRYIELDVOL)
+tmp.dat$VRYIELDVOLRank <- tmp.dat$VRYIELDVOLRank/max(tmp.dat$VRYIELDVOLRank)
+tmp.dat$Field <- 'Home Corn 2016'
+harvest.dat <- rbind(harvest.dat,tmp.dat)
+
+tmp.dat <- read.csv('./yield/Home Soybeans 2017.csv')[,columns]
+tmp.dat$VRYIELDVOLRank <- rank(tmp.dat$VRYIELDVOL)
+tmp.dat$VRYIELDVOLRank <- tmp.dat$VRYIELDVOLRank/max(tmp.dat$VRYIELDVOLRank)
+tmp.dat$Field <- 'Home Soybeans 2017'
+harvest.dat <- rbind(harvest.dat,tmp.dat)
+
+tmp.dat <- read.csv('./yield/Home Corn 2018.csv')[,columns]
+tmp.dat$VRYIELDVOLRank <- rank(tmp.dat$VRYIELDVOL)
+tmp.dat$VRYIELDVOLRank <- tmp.dat$VRYIELDVOLRank/max(tmp.dat$VRYIELDVOLRank)
+tmp.dat$Field <- 'Home Corn 2018'
+harvest.dat <- rbind(harvest.dat,tmp.dat)
+```
+
+
+
+```{r,fig.width=16,fig.height=10}
+library(ggplot2)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+ggplot(harvest.dat, aes(X,Y)) + 
+geom_point(aes(colour = VRYIELDVOLRank),size=1) + 
+scale_colour_gradient(low=cbPalette[5], high=cbPalette[6]) +
+labs(colour = "Yield (Rank)", x="X (m)", y="Y (m)", title = "Yield Maps") + facet_wrap(~ Field,nrow=2)
+```
+
+Suppose we have three management zones. We'll include ranks equivalent to 1 sd in the medium management zone, and the outliers will be either high or low. 
+
+```{r}
+harvest.dat$Zone <- 'Medium'
+#harvest.dat$Zone[harvest.dat$VRYIELDVOLRank>pnorm(1)] <- 'High'
+#harvest.dat$Zone[harvest.dat$VRYIELDVOLRank<pnorm(-1)] <- 'Low'
+harvest.dat$Zone[harvest.dat$VRYIELDVOLRank>0.75] <- 'High'
+harvest.dat$Zone[harvest.dat$VRYIELDVOLRank<0.25] <- 'Low'
+```
+
+```{r,fig.width=16,fig.height=10}
+
+ggplot(harvest.dat, aes(X,Y)) + 
+geom_point(aes(colour = VRYIELDVOLRank),size=1) + 
+scale_colour_gradient(low=cbPalette[5], high=cbPalette[6]) +
+labs(colour = "Yield (Rank)", x="X (m)", y="Y (m)", title = "Yield Maps") + facet_wrap(~ Zone,nrow=1)
+```
+
+Can we coallesce these individual point estimates for yield into a rational management zone map? Would this field even benefit from precision ag zone management?
+
+
+# Process Files
+
+The raw data are in shapefile format, but I've had difficulties with these formats in R, so I've saved the files in CSV in a different project. One quirk with these files is that they have multiple and commonly identical sample values for the same harvest, so we process the raw CSV and save the processed files to CSV in this project.
+
+# Screen Data
+
+We may, at first, assume harvest data are uniformly sampled. However, in many cases, the fields were not harvested in a single day, and harvests may be spread over multiple weeks. We may need to screen the data and include harvest date as a covariate.
+
+# Spatio-Temporal Covariates
+
+There are many environmental factors that influence yield. We may wish to 'scrape' associated data from other web sources, such as
+
+- http://prism.oregonstate.edu
+
+- https://pubs.er.usgs.gov/publication/70170912
+
+- https://sdmdataaccess.nrcs.usda.gov
+
+- https://websoilsurvey.sc.egov.usda.gov/App/HomePage.htm
+
+- https://earthdata.nasa.gov/earth-observation-data/near-real-time/hazards-and-disasters/vegetation
+
+We would be providing data aggregation similar to
+
+- https://analytics.ag/FarmScope
