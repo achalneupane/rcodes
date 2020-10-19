@@ -1,0 +1,8 @@
+library (qqman) 
+LOGISTIC<-read.table("ADGC_Hispanic-logistic-OR-CI.assoc.logistic",head=T) 
+jpeg("ADGC_Hispanic-QQ.jpg", units="mm", width=190, height=142, res=1000) 
+qq(LOGISTIC$P) 
+dev.off() 
+jpeg("ADGC_Hispanic-Manhattan.jpg", units="mm", width=190, height=142, res=1000) 
+manhattan(LOGISTIC, main = "ADGC_Hispanic", ylim=c(0,105) cex = 0.6, cex.axis = 0.9, col = c("blue4", "orange3"), suggestiveline = T, genomewideline = T, chrlabs = c(1:20, "P", "Q")) 
+dev.off()
