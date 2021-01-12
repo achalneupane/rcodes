@@ -1,4 +1,4 @@
-#!/usr/bin/Rscript --vanilla --slave
+#!/usr/bin/Rscript 
 
 ### 2020-01-12 - Achal
 ### Small script to calcualte average DP from  GATK extracted table
