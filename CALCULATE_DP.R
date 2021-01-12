@@ -1,3 +1,10 @@
+#!/usr/bin/Rscript --vanilla --slave
+
+### 2017-03-01 - vifehe
+### Small script to calcualte average DP from  GATK extracted table
+### UAGE: ./CALCULATE_DP.R ${INFILE}
+
+
 library(tools)
 require(data.table)
 library(data.table)
