@@ -2,13 +2,6 @@
 
   # This is a helper functoin to calculate LAMBDA
   
-  inflation <- function(pvalues) {
-    chisq <- qchisq(1 - pvalues, 1)
-    lambda <- median(chisq) / qchisq(0.5, 1)
-    lambda
-  }
-  LAMBDA <- inflation(pvalues)
-
 qqunif.plot<-function(pvalues, 
                       should.thin=T, thin.obs.places=2, thin.exp.places=2, 
                       xlab=expression(paste("Expected (",-log[10], " p-value)")),
@@ -106,6 +99,13 @@ qqunif.plot<-function(pvalues,
     A$ylim = A$xlim
     return(A)
   }
+  
+    inflation <- function(pvalues) {
+    chisq <- qchisq(1 - pvalues, 1)
+    LAMBDA <- median(chisq) / qchisq(0.5, 1)
+    return(LAMBDA)
+  }
+  # LAMBDA <- inflation(pvalues)
   
   
   panel = function(...) {
