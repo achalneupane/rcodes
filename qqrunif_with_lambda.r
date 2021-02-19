@@ -9,16 +9,7 @@
 # between samples, and DNA sample quality.
 # Deflation will occur due to phenotypically discordant samples, and other causes.
 
-# This is a helper functoin to calculate LAMBDA
-inflation <- function(...) {
-  chisq <- qchisq(1 - pvalues, 1)
-  lambda <- median(chisq) / qchisq(0.5, 1)
-  return(lambda)
-}
-
-LAMBDA <- inflation(pvalues)
-
-qqunif.plot<-function(pvalues,
+qqunif.plot<-function(pvalues, LAMBDA=LAMBDA,
                       should.thin=T, thin.obs.places=2, thin.exp.places=2, 
                       xlab=expression(paste("Expected (",-log[10], " p-value)")),
                       ylab=expression(paste("Observed (",-log[10], " p-value)")), 
