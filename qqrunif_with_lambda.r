@@ -126,7 +126,7 @@ qqunif.plot<-function(pvalues, posX=2, poxY=4,
              panel.qqconf(n, conf.points=conf.points, 
                           conf.col=conf.col, conf.alpha=conf.alpha)
            };
-           panel.text(posX, posX, sprintf("λ = %.2f", LAMBDA))
+           panel.text(posX, posY, sprintf("λ = %.2f", LAMBDA))
            panel.xyplot(x,y, ...);
            panel.abline(0,1);
          }, par.settings=par.settings, ...
