@@ -103,9 +103,8 @@ qqunif.plot<-function(pvalues,
     inflation <- function(pvalues) {
     chisq <- qchisq(1 - pvalues, 1)
     LAMBDA <- median(chisq) / qchisq(0.5, 1)
-    return(LAMBDA)
+    LAMBDA
   }
-  # LAMBDA <- inflation(pvalues)
   
   
   panel = function(...) {
@@ -121,7 +120,7 @@ qqunif.plot<-function(pvalues,
              panel.qqconf(n, conf.points=conf.points, 
                           conf.col=conf.col, conf.alpha=conf.alpha)
            };
-           panel.text(2, 5, sprintf("λ = %.2f", LAMBDA))
+           panel.text(2, 5, sprintf("λ = %.2f", inflation(pvalues)))
            panel.xyplot(x,y, ...);
            panel.abline(0,1);
          }, par.settings=par.settings, ...
