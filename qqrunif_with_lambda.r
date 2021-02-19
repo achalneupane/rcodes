@@ -18,7 +18,7 @@ inflation <- function(...) {
 
 LAMBDA <- inflation(pvalues)
 
-qqunif.plot<-function(pvalues, posX=2, poxY=4,
+qqunif.plot<-function(pvalues,
                       should.thin=T, thin.obs.places=2, thin.exp.places=2, 
                       xlab=expression(paste("Expected (",-log[10], " p-value)")),
                       ylab=expression(paste("Observed (",-log[10], " p-value)")), 
@@ -126,7 +126,7 @@ qqunif.plot<-function(pvalues, posX=2, poxY=4,
              panel.qqconf(n, conf.points=conf.points, 
                           conf.col=conf.col, conf.alpha=conf.alpha)
            };
-           panel.text(posX, posY, sprintf("λ = %.2f", LAMBDA))
+           panel.text(2, 4, sprintf("λ = %.2f", LAMBDA))
            panel.xyplot(x,y, ...);
            panel.abline(0,1);
          }, par.settings=par.settings, ...
