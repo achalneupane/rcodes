@@ -1,7 +1,14 @@
 # # USAGE: qqunif.plot(my.pvalues) #these are the raw p-values, not log-transformed
 
-  # This is a helper functoin to calculate LAMBDA
-  
+# This is a helper functoin to calculate LAMBDA
+inflation <- function(...) {
+  chisq <- qchisq(1 - pvalues, 1)
+  lambda <- median(chisq) / qchisq(0.5, 1)
+  return(lambda)
+}
+
+LAMBDA <- inflation(pvalues)
+
 qqunif.plot<-function(pvalues, 
                       should.thin=T, thin.obs.places=2, thin.exp.places=2, 
                       xlab=expression(paste("Expected (",-log[10], " p-value)")),
@@ -60,7 +67,7 @@ qqunif.plot<-function(pvalues,
     }
   }
   
- 
+  
   
   #this is a helper function to draw the confidence interval
   panel.qqconf<-function(n, conf.points=1000, conf.col="gray", conf.alpha=.05, ...) {
@@ -100,17 +107,7 @@ qqunif.plot<-function(pvalues,
     return(A)
   }
   
-    inflation <- function(pvalues) {
-    chisq <- qchisq(1 - pvalues, 1)
-    lambda <- median(chisq) / qchisq(0.5, 1)
-    return(lambda)
-  }
-  
-  
-  panel = function(...) {
-    panel.text(4, 0, "Hello world!")
-    panel.xyplot(...)
-  }
+
   
   #draw the plot
   xyplot(pvalues~exp.x, groups=grp, xlab=xlab, ylab=ylab, aspect=aspect,
@@ -120,9 +117,12 @@ qqunif.plot<-function(pvalues,
              panel.qqconf(n, conf.points=conf.points, 
                           conf.col=conf.col, conf.alpha=conf.alpha)
            };
-           panel.text(2, 5, sprintf("λ = %.2f", inflation(pvalues)))
+           panel.text(2, 5, sprintf("λ = %.2f", LAMBDA))
            panel.xyplot(x,y, ...);
            panel.abline(0,1);
          }, par.settings=par.settings, ...
   )
 }
+
+
+qqunif.plot(my.pvalues)
