@@ -1,5 +1,14 @@
 # # USAGE: qqunif.plot(my.pvalues) #these are the raw p-values, not log-transformed
 
+  # This is a helper functoin to calculate LAMBDA
+  
+  inflation <- function(pvalues) {
+    chisq <- qchisq(1 - pvalues, 1)
+    lambda <- median(chisq) / qchisq(0.5, 1)
+    lambda
+  }
+  LAMBDA <- inflation(pvalues)
+
 qqunif.plot<-function(pvalues, 
                       should.thin=T, thin.obs.places=2, thin.exp.places=2, 
                       xlab=expression(paste("Expected (",-log[10], " p-value)")),
@@ -58,14 +67,7 @@ qqunif.plot<-function(pvalues,
     }
   }
   
-  # This is a helper functoin to calculate LAMBDA
-  inflation <- function(pvalues) {
-    chisq <- qchisq(1 - pvalues, 1)
-    lambda <- median(chisq) / qchisq(0.5, 1)
-    lambda
-  }
-  LAMBDA <- inflation(pvalues)
-  
+ 
   
   #this is a helper function to draw the confidence interval
   panel.qqconf<-function(n, conf.points=1000, conf.col="gray", conf.alpha=.05, ...) {
