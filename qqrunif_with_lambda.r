@@ -1,5 +1,14 @@
 # # USAGE: qqunif.plot(my.pvalues) #these are the raw p-values, not log-transformed
 
+# Genomic inflation factor λ.
+# λ = observed median of test statistic distribution / expected median of the test statistic
+# distribution. For 1 degree of freedom, the X2 distribution has an expected median of
+# 0.455. A λ of 1.05 is considered acceptable. >1.1 is troubling, and indicates there is
+# some inflation of the p values. Causes of inflation include: technical batch effects (if
+# samples were not processed in parallel), population stratification, unknown relatedness
+# between samples, and DNA sample quality.
+# Deflation will occur due to phenotypically discordant samples, and other causes.
+
 # This is a helper functoin to calculate LAMBDA
 inflation <- function(...) {
   chisq <- qchisq(1 - pvalues, 1)
