@@ -102,8 +102,8 @@ qqunif.plot<-function(pvalues,
   
     inflation <- function(pvalues) {
     chisq <- qchisq(1 - pvalues, 1)
-    LAMBDA <- median(chisq) / qchisq(0.5, 1)
-    LAMBDA
+    lambda <- median(chisq) / qchisq(0.5, 1)
+    return(lambda)
   }
   
   
