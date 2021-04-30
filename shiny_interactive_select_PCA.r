@@ -48,5 +48,5 @@ server <- function(input, output) {
     brushedPoints(PCAs, input$plot1_brush)
   })
 }
-options(max.print=10000)
+# options(max.print=10000)
 shinyApp(ui, server)
