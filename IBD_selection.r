@@ -54,6 +54,7 @@ server <- function(input, output, session) {
     else 
       # filter(IBD_DF, key %in% click_data$key) %>% select(-key)
     SELECTED_POINTS <- filter(IBD_DF, key %in% click_data$key) %>% select(key)
+    return(SELECTED_POINTS)
     ## Write to file
     # write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), "selected_points.csv")
     ## Subsetting in above step based on selected data points and removing the key column
@@ -61,5 +62,4 @@ server <- function(input, output, session) {
   })
 }
 shinyApp(ui, server)
-return (SELECTED_POINTS)
 }
