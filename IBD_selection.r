@@ -52,11 +52,9 @@ server <- function(input, output, session) {
     if(is.null(click_data)) 
       "No data points selected on scatter plot..." 
     else 
-      # filter(IBD_DF, key %in% click_data$key) %>% select(-key)
-    SELECTED_POINTS <- filter(IBD_DF, key %in% click_data$key) %>% select(key)
-    return(SELECTED_POINTS)
+    # filter(IBD_DF, key %in% click_data$key) %>% select(-key)
     ## Write to file
-    # write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), "selected_points.csv")
+    write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), "selected_points.csv")
     ## Subsetting in above step based on selected data points and removing the key column
     
   })
