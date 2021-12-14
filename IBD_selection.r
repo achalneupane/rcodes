@@ -1,3 +1,4 @@
+SELECT_IBD <- function(IBD_DF){
 library(plotly)
 library(ggplot2)
 library(shiny)
@@ -58,3 +59,4 @@ server <- function(input, output, session) {
   })
 }
 shinyApp(ui, server)
+}
