@@ -38,6 +38,7 @@ SELECT_IBD <- function(IBD_DF){
       
     })
     
+    h <- c()
     ## returns the data related to data points selected by the user
     output$click <- renderPrint({
       
@@ -54,7 +55,9 @@ SELECT_IBD <- function(IBD_DF){
       else 
         # filter(IBD_DF, key %in% click_data$key) %>% select(-key)
         ## Write to file
-        write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), "selected_points.csv", append = TRUE)
+        # i <- unname(as.vector(filter(IBD_DF, key %in% click_data$key) %>% select(key)))
+        samples <- IBD_DF$key [IBD_DF$key %in% click_data$key]
+        write.table(samples, "selected_points.csv", append = TRUE, col.names = F, row.names = F)
       ## Subsetting in above step based on selected data points and removing the key column
       
     })
