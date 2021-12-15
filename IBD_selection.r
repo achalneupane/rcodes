@@ -12,7 +12,7 @@ SELECT_IBD <- function(IBD_DF){
 
   ### Ui code begins below
   ui <- fluidPage(
-    h1("Demo - Interactive data point selection with ggplotly/plotly charts"),
+    h1("Achal's Shinyi app to SELCECT IBD points from the chart"),
     h4("Subset the dataset using the data points selected from the chart. Drag and select one or multi data points"),
     br(),
     ## Plotly plot display
