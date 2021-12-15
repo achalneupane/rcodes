@@ -54,10 +54,9 @@ server <- function(input, output, session) {
     else 
     # filter(IBD_DF, key %in% click_data$key) %>% select(-key)
     ## Write to file
-    ## write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), "selected_points.csv", append = TRUE)
+    write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), paste("selected_points-",format(Sys.time(), "%a-%b-%d-%H-%M-%S-%Y"), ".csv"))
     ## Subsetting in above step based on selected data points and removing the key column
-    sink(file = "selected_points.csv", append = FALSE, type = c("output", "message"), split = FALSE)  
-    
+   
   })
 }
 shinyApp(ui, server)
