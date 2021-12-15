@@ -9,7 +9,17 @@ IBD_DF
 rownames(IBD_DF) <- paste(IBD_DF$IID1,IBD_DF$IID2, sep = ":")
 IBD_DF$key <- rownames(IBD_DF)
 
-
+serialNext = function(prefix){
+    if(!file.exists(prefix)){return(prefix)}
+    i=1
+    repeat {
+       f = paste(prefix,i,sep=".")
+       if(!file.exists(f)){return(f)}
+       i=i+1
+     }
+  }
+  
+  
 ### Ui code begins below
 ui <- fluidPage(
   h1("Demo - Interactive data point selection with ggplotly/plotly charts"),
@@ -54,7 +64,7 @@ server <- function(input, output, session) {
     else 
     # filter(IBD_DF, key %in% click_data$key) %>% select(-key)
     ## Write to file
-    write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), paste("selected_points-",format(Sys.time(), "%a-%b-%d-%H-%M-%S-%Y"), ".csv"))
+    write.table(filter(IBD_DF, key %in% click_data$key) %>% select(key), paste0(serialNext("selected_points"), ".csv"))
     ## Subsetting in above step based on selected data points and removing the key column
    
   })
