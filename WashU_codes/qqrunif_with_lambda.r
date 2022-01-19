@@ -125,4 +125,4 @@ qqunif.plot<-function(pvalues, LAMBDA=LAMBDA,
 }
 
 
-# qqunif.plot(my.pvalues)
+qqunif.plot(my.pvalues)
