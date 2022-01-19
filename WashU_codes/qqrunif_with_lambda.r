@@ -11,6 +11,7 @@
 
 # install.packages("mice")
 library("mice")
+library(lattice)
 
 qqunif.plot<-function(pvalues, LAMBDA=LAMBDA,
                       should.thin=T, thin.obs.places=2, thin.exp.places=2, 
