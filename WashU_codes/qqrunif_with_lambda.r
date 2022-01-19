@@ -9,6 +9,9 @@
 # between samples, and DNA sample quality.
 # Deflation will occur due to phenotypically discordant samples, and other causes.
 
+# install.packages("mice")
+library("mice")
+
 qqunif.plot<-function(pvalues, LAMBDA=LAMBDA,
                       should.thin=T, thin.obs.places=2, thin.exp.places=2, 
                       xlab=expression(paste("Expected (",-log[10], " p-value)")),
